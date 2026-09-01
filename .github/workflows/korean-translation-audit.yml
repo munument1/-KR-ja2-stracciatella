@@ -31,7 +31,9 @@ jobs:
           python-version: '3.12'
       - name: Audit Korean translation coverage
         run: |
-          python tools/korean/audit_translation_coverage.py --json-out korean-translation-coverage.json
+          python tools/korean/audit_translation_coverage.py \
+            --json-out korean-translation-coverage.json \
+            --list-untranslated translation
       - name: Upload audit report
         if: always()
         uses: actions/upload-artifact@v4
