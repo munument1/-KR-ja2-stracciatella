@@ -529,6 +529,9 @@ int main(int argc, char* argv[])
 		return EXIT_SUCCESS;
 	} catch (const std::exception& e) {
 		SLOGE("Uncaught exception in main: {}", e.what());
+#ifdef _WIN32
+		print_native_stacktrace();
+#endif
 		fprintf(stderr, "\nUncaught exception in main: %s\n", e.what());
 		fflush(stderr);
 		try {
