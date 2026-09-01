@@ -46,12 +46,12 @@ jobs:
 
       - name: Commit imported runtime dialogue
         run: |
-          if git diff --quiet -- assets/mods/korean-localization/data/MercEdt; then
+          git add assets/mods/korean-localization/data/MercEdt
+          if git diff --cached --quiet; then
             echo 'No MercEdt changes to commit.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add assets/mods/korean-localization/data/MercEdt
           git commit -m 'feat(korean): import vanilla-compatible MercEdt translations'
           git push origin HEAD:korean-localization
