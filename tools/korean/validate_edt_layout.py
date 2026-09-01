@@ -20,7 +20,7 @@ import sys
 
 BYTES_PER_CHAR = 2
 EXPECTED_COUNTS = {
-    "MercEdt": 54,
+    "MercEdt": 68,
     "NPCData": 161,
     "BinaryData": 15,
 }
