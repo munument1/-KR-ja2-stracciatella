@@ -57,6 +57,12 @@ bool isChineseVersion()
 	return s_gameVersion == GameVersion::SIMPLIFIED_CHINESE;
 }
 
+/** Check if this is Korean version of the game. */
+bool isKoreanVersion()
+{
+	return s_gameVersion == GameVersion::KOREAN;
+}
+
 /** Get major map version. */
 FLOAT getMajorMapVersion()
 {
