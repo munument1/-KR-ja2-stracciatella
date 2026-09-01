@@ -11,6 +11,7 @@ on:
       - 'assets/mods/simplified-chinese-localization/data/**/*.edt'
       - 'tools/korean/validate_edt_layout.py'
       - 'tools/korean/sanitize_edt_padding.py'
+      - 'tools/korean/audit_edt_text.py'
       - '.github/workflows/korean-edt-layout.yml'
   pull_request:
     branches:
@@ -22,6 +23,7 @@ on:
       - 'assets/mods/simplified-chinese-localization/data/**/*.edt'
       - 'tools/korean/validate_edt_layout.py'
       - 'tools/korean/sanitize_edt_padding.py'
+      - 'tools/korean/audit_edt_text.py'
       - '.github/workflows/korean-edt-layout.yml'
   workflow_dispatch:
 
@@ -39,3 +41,6 @@ jobs:
 
       - name: Validate all Korean classic EDT resources
         run: python tools/korean/validate_edt_layout.py --verbose --strict
+
+      - name: Audit decoded Korean EDT text
+        run: python tools/korean/audit_edt_text.py --fail-on-suspicious
