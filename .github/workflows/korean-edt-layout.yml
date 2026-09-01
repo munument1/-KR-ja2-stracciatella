@@ -10,6 +10,7 @@ on:
       - 'assets/mods/simplified-chinese-localization/data/**/*.EDT'
       - 'assets/mods/simplified-chinese-localization/data/**/*.edt'
       - 'tools/korean/validate_edt_layout.py'
+      - 'tools/korean/sanitize_edt_padding.py'
       - '.github/workflows/korean-edt-layout.yml'
   pull_request:
     branches:
@@ -20,6 +21,7 @@ on:
       - 'assets/mods/simplified-chinese-localization/data/**/*.EDT'
       - 'assets/mods/simplified-chinese-localization/data/**/*.edt'
       - 'tools/korean/validate_edt_layout.py'
+      - 'tools/korean/sanitize_edt_padding.py'
       - '.github/workflows/korean-edt-layout.yml'
   workflow_dispatch:
 
