@@ -167,7 +167,9 @@ static GlyphIdx GetGlyphIndex(char32_t c)
 	if (result != translationTable->end()) {
 		return result->second;
 	}
-	SLOGE("Invalid character given U+{04x}", c);
+	SLOGE("INVALID_CHARACTER: Codepoint U+{:04X} not found in translation table", static_cast<uint32_t>(c));
+	fprintf(stderr, "\nINVALID_CHARACTER: Codepoint U+%04X not found in translation table\n", static_cast<uint32_t>(c));
+	fflush(stderr);
 	auto questionMark = translationTable->find(L'?')->second;
 	return questionMark;
 }
