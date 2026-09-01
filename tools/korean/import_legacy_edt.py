@@ -12,6 +12,11 @@ keeping only the reference-sized prefix. This is safe for MercEdt because vanill
 IDs 0..116 keep the same ordering in JA2 1.13; the extra 1.13 merc quote IDs are appended
 after the vanilla range rather than inserted into it.
 
+With --pad-empty-reference-tail, a shorter legacy file may be extended only when every
+byte in the missing reference tail is zero. That means the missing vanilla records are
+structurally empty padding, so extending with zero-filled records cannot invent or
+replace dialogue text.
+
 Initial supported category: MercEdt.
 """
 
@@ -58,6 +63,15 @@ def sort_key(name: str) -> tuple[int, int | str]:
         return (1, stem)
 
 
+def nonzero_tail_records(tail: bytes, first_record: int) -> list[int]:
+    result: list[int] = []
+    for offset in range(0, len(tail), EDT_RECORD_SIZE):
+        record = tail[offset : offset + EDT_RECORD_SIZE]
+        if any(record):
+            result.append(first_record + offset // EDT_RECORD_SIZE)
+    return result
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -92,6 +106,11 @@ def parse_args() -> argparse.Namespace:
         "--trim-extra-records",
         action="store_true",
         help="allow a longer legacy MercEdt to be truncated to the vanilla reference record count",
+    )
+    parser.add_argument(
+        "--pad-empty-reference-tail",
+        action="store_true",
+        help="allow a shorter legacy MercEdt to be zero-padded only when the missing reference records are completely empty",
     )
     parser.add_argument(
         "--strict",
@@ -142,6 +161,7 @@ def main() -> int:
 
     copied = 0
     copied_trimmed = 0
+    copied_padded = 0
     verified_existing = 0
     skipped_existing = 0
     mismatched = 0
@@ -168,15 +188,29 @@ def main() -> int:
             invalid += 1
             continue
 
-        trim = False
+        src_data = src.read_bytes()
+        ref_data = ref.read_bytes()
+        mode = "exact"
+
         if src_size < ref_size:
-            print(
-                f"MISMATCH {name}: legacy={src_size} bytes ({src_size // EDT_RECORD_SIZE} records), "
-                f"vanilla={ref_size} bytes ({ref_size // EDT_RECORD_SIZE} records); legacy source is too short"
-            )
-            mismatched += 1
-            continue
-        if src_size > ref_size:
+            tail = ref_data[src_size:]
+            tail_records = nonzero_tail_records(tail, src_size // EDT_RECORD_SIZE)
+            if args.pad_empty_reference_tail and not tail_records:
+                candidate = src_data + bytes(ref_size - src_size)
+                mode = "padded"
+            else:
+                extra = ""
+                if tail_records:
+                    preview = ", ".join(str(record) for record in tail_records[:12])
+                    suffix = "..." if len(tail_records) > 12 else ""
+                    extra = f"; non-empty vanilla tail records: {preview}{suffix}"
+                print(
+                    f"MISMATCH {name}: legacy={src_size} bytes ({src_size // EDT_RECORD_SIZE} records), "
+                    f"vanilla={ref_size} bytes ({ref_size // EDT_RECORD_SIZE} records); legacy source is too short{extra}"
+                )
+                mismatched += 1
+                continue
+        elif src_size > ref_size:
             if not args.trim_extra_records:
                 print(
                     f"MISMATCH {name}: legacy={src_size} bytes ({src_size // EDT_RECORD_SIZE} records), "
@@ -184,17 +218,17 @@ def main() -> int:
                 )
                 mismatched += 1
                 continue
-            trim = True
+            candidate = src_data[:ref_size]
+            mode = "trimmed"
+        else:
+            candidate = src_data
 
-        src_data = src.read_bytes()
-        candidate = src_data[:ref_size]
         candidate_hash = sha256_bytes(candidate)
         record_count = ref_size // EDT_RECORD_SIZE
 
         if dst.exists() and not args.overwrite:
             dst_hash = sha256(dst)
             if dst_hash == candidate_hash:
-                mode = "trimmed prefix" if trim else "exact source"
                 print(f"OK       {name}: already imported, {record_count} records ({mode})")
                 verified_existing += 1
             else:
@@ -202,32 +236,37 @@ def main() -> int:
                 skipped_existing += 1
             continue
 
-        mode = "TRIM" if trim else "SAFE"
         if args.dry_run:
-            if trim:
-                print(
-                    f"{mode:<8} {name}: {src_size // EDT_RECORD_SIZE} -> {record_count} records"
-                )
+            if mode == "trimmed":
+                print(f"TRIM     {name}: {src_size // EDT_RECORD_SIZE} -> {record_count} records")
+            elif mode == "padded":
+                print(f"PAD      {name}: {src_size // EDT_RECORD_SIZE} -> {record_count} records; reference tail empty")
             else:
-                print(f"{mode:<8} {name}: {record_count} records")
+                print(f"SAFE     {name}: {record_count} records")
             continue
 
-        if trim:
-            dst.write_bytes(candidate)
-        else:
+        if mode == "exact":
             shutil.copyfile(src, dst)
+        else:
+            dst.write_bytes(candidate)
 
         dst_hash = sha256(dst)
         if dst_hash != candidate_hash:
             print(f"ERROR    {name}: SHA-256 mismatch after import", file=sys.stderr)
             return 3
 
-        if trim:
+        if mode == "trimmed":
             print(
                 f"COPIED   {name}: trimmed {src_size // EDT_RECORD_SIZE} -> {record_count} records, "
                 f"sha256={candidate_hash[:12]}"
             )
             copied_trimmed += 1
+        elif mode == "padded":
+            print(
+                f"COPIED   {name}: padded {src_size // EDT_RECORD_SIZE} -> {record_count} records; "
+                f"reference tail empty, sha256={candidate_hash[:12]}"
+            )
+            copied_padded += 1
         else:
             print(f"COPIED   {name}: {record_count} records, sha256={candidate_hash[:12]}")
         copied += 1
@@ -246,6 +285,7 @@ def main() -> int:
     print(f"  common files       : {len(common_names)}")
     print(f"  copied             : {copied}")
     print(f"  copied with trim   : {copied_trimmed}")
+    print(f"  copied with padding: {copied_padded}")
     print(f"  already identical  : {verified_existing}")
     print(f"  existing preserved : {skipped_existing}")
     print(f"  unsafe mismatches  : {mismatched}")
