@@ -20,7 +20,8 @@ enum class VanillaVersion(val value: String) {
     POLISH("POLISH"),
     RUSSIAN("RUSSIAN"),
     RUSSIAN_GOLD("RUSSIAN_GOLD"),
-    SIMPLIFIED_CHINESE("SIMPLIFIED_CHINESE");
+    SIMPLIFIED_CHINESE("SIMPLIFIED_CHINESE"),
+    KOREAN("KOREAN");
 
     fun getLabel(): String {
         return when (this) {
@@ -33,6 +34,7 @@ enum class VanillaVersion(val value: String) {
             RUSSIAN -> "Russian"
             RUSSIAN_GOLD -> "Russian (Gold)"
             SIMPLIFIED_CHINESE -> "Simplified Chinese"
+            KOREAN -> "Korean"
         }
     }
 
