@@ -280,11 +280,6 @@ static void HandleMainMenuInput(void)
 		{
 			switch (InputEvent.usParam)
 			{
-				case 'n':
-					gbHandledMainMenu = NEW_GAME;
-					SetMainMenuExitScreen(GAME_INIT_OPTIONS_SCREEN);
-					break;
-
 				case 'q': if (_KeyDown(CTRL)) gbHandledMainMenu = QUIT; break;					
 				case SDLK_ESCAPE: gbHandledMainMenu = QUIT; break;
 

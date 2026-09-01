@@ -277,90 +277,12 @@ std::vector<ST::string> InitGlobalLocale()
 		problems.emplace_back(ST::format("failed to set unicode ctype for locale '{}', using ctype '{}'", setlocale(LC_ALL, nullptr), setlocale(LC_CTYPE, nullptr)));
 	}
 #endif
+
 	return problems;
 }
 
-#ifdef _WIN32
-#include <crtdbg.h>
-#include <windows.h>
-#include <dbghelp.h>
-#pragma comment(lib, "dbghelp.lib")
-
-static void print_native_stacktrace()
-{
-	HANDLE process = GetCurrentProcess();
-	HANDLE thread = GetCurrentThread();
-	SymInitialize(process, NULL, TRUE);
-
-	CONTEXT context;
-	memset(&context, 0, sizeof(CONTEXT));
-	context.ContextFlags = CONTEXT_FULL;
-	RtlCaptureContext(&context);
-
-	STACKFRAME64 stackFrame;
-	memset(&stackFrame, 0, sizeof(STACKFRAME64));
-	stackFrame.AddrPC.Offset = context.Rip;
-	stackFrame.AddrPC.Mode = AddrModeFlat;
-	stackFrame.AddrFrame.Offset = context.Rbp;
-	stackFrame.AddrFrame.Mode = AddrModeFlat;
-	stackFrame.AddrStack.Offset = context.Rsp;
-	stackFrame.AddrStack.Mode = AddrModeFlat;
-
-	SLOGE("=== STACK TRACE FOR CRT ASSERTION / INVALID PARAM ===");
-	while (StackWalk64(IMAGE_FILE_MACHINE_AMD64, process, thread, &stackFrame, &context, NULL, SymFunctionTableAccess64, SymGetModuleBase64, NULL))
-	{
-		DWORD64 addr = stackFrame.AddrPC.Offset;
-		if (addr == 0) break;
-
-		char buffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR)];
-		PSYMBOL_INFO symbol = (PSYMBOL_INFO)buffer;
-		symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
-		symbol->MaxNameLen = MAX_SYM_NAME;
-		DWORD64 displacement = 0;
-
-		IMAGEHLP_LINE64 line;
-		memset(&line, 0, sizeof(line));
-		line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
-		DWORD lineDisplacement = 0;
-
-		const char* name = "unknown";
-		if (SymFromAddr(process, addr, &displacement, symbol)) {
-			name = symbol->Name;
-		}
-
-		if (SymGetLineFromAddr64(process, addr, &lineDisplacement, &line)) {
-			SLOGE("  at {} [{}:{}]", name, line.FileName, line.LineNumber);
-		} else {
-			SLOGE("  at {} [0x{:x}]", name, addr);
-		}
-	}
-	SLOGE("====================================================");
-}
-
-static void MyInvalidParamHandler(const wchar_t* expression, const wchar_t* function, const wchar_t* file, unsigned int line, uintptr_t pReserved)
-{
-	SLOGE("INVALID PARAMETER: expr={}, func={}, file={}:{}", 
-		expression ? ST::string::from_utf16((const char16_t*)expression).c_str() : "null",
-		function ? ST::string::from_utf16((const char16_t*)function).c_str() : "null",
-		file ? ST::string::from_utf16((const char16_t*)file).c_str() : "null",
-		line);
-	print_native_stacktrace();
-}
-
-static int MyReportHook(int reportType, char* message, int* returnValue)
-{
-	SLOGE("CRT REPORT HOOK: type={}, msg={}", reportType, message ? message : "null");
-	print_native_stacktrace();
-	return FALSE;
-}
-#endif
-
 int main(int argc, char* argv[])
 {
-#ifdef _WIN32
-	_set_invalid_parameter_handler(MyInvalidParamHandler);
-	_CrtSetReportHook(MyReportHook);
-#endif
     try {
 		#ifdef __ANDROID__
 		JNIEnv* jniEnv = (JNIEnv*)SDL_GetAndroidJNIEnv();
@@ -527,26 +449,11 @@ int main(int argc, char* argv[])
 		GCM = NULL;
 
 		return EXIT_SUCCESS;
-	} catch (const std::exception& e) {
-		SLOGE("Uncaught exception in main: {}", e.what());
-#ifdef _WIN32
-		print_native_stacktrace();
-#endif
-		fprintf(stderr, "\nUncaught exception in main: %s\n", e.what());
-		fflush(stderr);
-		try {
-			TerminationHandler();
-		} catch (...) {
-			return 27;
-		}
-		return EXIT_FAILURE;
 	} catch (...) {
-		SLOGE("Unknown uncaught exception in main");
-		fprintf(stderr, "\nUnknown uncaught exception in main\n");
-		fflush(stderr);
 		try {
 			TerminationHandler();
 		} catch (...) {
+			// If you ever see return code 27, try to set a breakpoint here
 			return 27;
 		}
 		return EXIT_FAILURE;

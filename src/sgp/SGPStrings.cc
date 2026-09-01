@@ -1,5 +1,4 @@
 #include "SGPStrings.h"
-#include "Logger.h"
 
 #include <string_theory/format>
 #include <string_theory/string>
@@ -151,7 +150,6 @@ ST::string st_fmt_printf_to_format(const ST::string& fmt_printf)
 	if (!err.empty())
 	{
 		ST::string what = ST::format("{}: '{}' -> '{}'", err, fmt_printf, fmt);
-		SLOGE("ST_FMT_PRINTF_ERROR: {}", what);
 		throw ST::bad_format(what.c_str());
 	}
 	return fmt;
