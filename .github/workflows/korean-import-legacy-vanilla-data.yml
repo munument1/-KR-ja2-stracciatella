@@ -1,0 +1,69 @@
+name: Import vanilla-compatible Korean BinaryData and NPCData
+
+on:
+  push:
+    branches:
+      - korean-localization
+    paths:
+      - 'tools/korean/import_legacy_vanilla_data.py'
+      - '.github/workflows/korean-import-legacy-vanilla-data.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Stracciatella Korean branch
+        uses: actions/checkout@v4
+        with:
+          ref: korean-localization
+          fetch-depth: 1
+
+      - name: Checkout legacy JA2 Korean patch
+        run: |
+          git clone --depth 1 https://github.com/munument1/Jagged-Alliance2-korean.git "$RUNNER_TEMP/legacy-ja2-korean"
+
+      - name: Import exact vanilla layout matches
+        run: |
+          python tools/korean/import_legacy_vanilla_data.py \
+            --legacy-root "$RUNNER_TEMP/legacy-ja2-korean" \
+            --report korean-vanilla-data-import.json
+
+      - name: Verify output against Stracciatella references
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path('korean-vanilla-data-import.json').read_text(encoding='utf-8'))
+          for group in report['groups']:
+              count = group['imported_count']
+              if count <= 0:
+                  raise SystemExit(f"{group['group']}: no exact-layout resources imported")
+              print(
+                  f"{group['group']}: imported={count}, "
+                  f"size-mismatch={len(group['size_mismatch'])}, "
+                  f"missing={len(group['missing_legacy'])}, "
+                  f"legacy-only={len(group['legacy_only'])}"
+              )
+          PY
+
+      - name: Upload import report
+        uses: actions/upload-artifact@v4
+        with:
+          name: korean-vanilla-data-import
+          path: korean-vanilla-data-import.json
+
+      - name: Commit imported runtime text resources
+        run: |
+          git add assets/mods/korean-localization/data/BinaryData assets/mods/korean-localization/data/NPCData
+          if git diff --cached --quiet; then
+            echo 'No BinaryData/NPCData changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat(korean): import vanilla-compatible BinaryData and NPCData'
+          git push origin HEAD:korean-localization
