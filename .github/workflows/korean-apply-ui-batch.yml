@@ -10,6 +10,10 @@ on:
       - 'tools/korean/audit_translation_coverage.py'
       - '.github/workflows/korean-apply-ui-batch.yml'
 
+concurrency:
+  group: korean-ui-translation-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
@@ -44,5 +48,5 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'feat(korean): translate first Stracciatella UI batch'
+          git commit -m 'feat(korean): apply reviewed Stracciatella UI batches'
           git push origin HEAD:korean-localization
