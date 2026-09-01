@@ -6,6 +6,7 @@ on:
       - korean-localization
     paths:
       - 'tools/korean/apply_ui_translation_batch_*.py'
+      - 'tools/korean/apply_korean_stat_message_patch.py'
       - 'tools/korean/validate_localization_strings.py'
       - 'tools/korean/audit_translation_coverage.py'
       - '.github/workflows/korean-apply-ui-batch.yml'
@@ -27,6 +28,12 @@ jobs:
           ref: korean-localization
           fetch-depth: 1
 
+      - name: Apply Korean stat-message source patch
+        run: |
+          if [ -f tools/korean/apply_korean_stat_message_patch.py ]; then
+            python tools/korean/apply_korean_stat_message_patch.py
+          fi
+
       - name: Apply UI translation batches
         run: |
           for batch in tools/korean/apply_ui_translation_batch_*.py; do
@@ -39,11 +46,15 @@ jobs:
           python tools/korean/validate_localization_strings.py
           python tools/korean/audit_translation_coverage.py --json-out korean-translation-coverage.json
 
-      - name: Commit translated UI strings
+      - name: Commit translated UI strings and Korean stat formatting
         run: |
-          git add assets/externalized/strings/translation-kor.json
+          git add \
+            assets/externalized/strings/translation-kor.json \
+            src/game/GameRes.h \
+            src/game/GameRes.cc \
+            src/game/Tactical/Campaign.cc
           if git diff --cached --quiet; then
-            echo 'No UI translation changes to commit.'
+            echo 'No Korean localization changes to commit.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
