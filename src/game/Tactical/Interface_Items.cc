@@ -2317,7 +2317,7 @@ void RenderItemDescriptionBox(void)
 
 		//Weight
 		HighlightIf(objectWeight <= EXCEPTIONAL_WEIGHT);
-		pStr = ST::format("{1.1f}", convertedWeight);
+		pStr = ST::format("{:.1f}", convertedWeight);
 		FindFontRightCoordinates(dx + ids[0].sX + ids[0].sValDx, dy + ids[0].sY, ITEM_STATS_WIDTH, ITEM_STATS_HEIGHT, pStr, BLOCKFONT2, &usX, &usY);
 		MPrint(usX, usY, pStr);
 
@@ -2469,7 +2469,7 @@ void RenderItemDescriptionBox(void)
 		}
 
 		//Weight
-		pStr = ST::format("{1.1f}", convertedWeight);
+		pStr = ST::format("{:.1f}", convertedWeight);
 		FindFontRightCoordinates(dx + ids[0].sX + ids[0].sValDx, dy + ids[0].sY, ITEM_STATS_WIDTH, ITEM_STATS_HEIGHT, pStr, BLOCKFONT2, &usX, &usY);
 		MPrint(usX, usY, pStr);
 

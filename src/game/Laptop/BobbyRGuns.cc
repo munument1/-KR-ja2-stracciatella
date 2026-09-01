@@ -776,7 +776,7 @@ static UINT16 DisplayCostAndQty(UINT16 usPosY, UINT16 usIndex, UINT16 usFontHeig
 	usPosY += usFontHeight + 2;
 
 
-	sTemp = ST::format("{3.2f} {}", GetWeightBasedOnMetricOption(GCM->getItem(usIndex)->getWeight()) / 10.0f, GetWeightUnitString());
+	sTemp = ST::format("{:.2f} {}", GetWeightBasedOnMetricOption(GCM->getItem(usIndex)->getWeight()) / 10.0f, GetWeightUnitString());
 	DrawTextToScreen(sTemp, BOBBYR_ITEM_STOCK_TEXT_X, usPosY, BOBBYR_ITEM_COST_TEXT_WIDTH, BOBBYR_ITEM_DESC_TEXT_FONT, BOBBYR_ITEM_DESC_TEXT_COLOR, FONT_MCOLOR_BLACK, RIGHT_JUSTIFIED);
 	usPosY += usFontHeight + 2;
 

@@ -547,7 +547,7 @@ static UINT16 DisplayAimPolicyParagraph(UINT16 usPosY, UINT8 ubPageNum, FLOAT fN
 	if(fNumber != 0.0)
 	{
 		//Display the section number
-		sTemp = ST::format("{2.1f}", fNumber);
+		sTemp = ST::format("{:.1f}", fNumber);
 		DrawTextToScreen(sTemp, AIM_POLICY_PARAGRAPH_NUMBER, usPosY, 0, AIM_POLICY_TEXT_FONT, AIM_POLICY_TEXT_COLOR, FONT_MCOLOR_BLACK, LEFT_JUSTIFIED);
 	}
 
@@ -566,7 +566,7 @@ static UINT16 DisplayAimPolicySubParagraph(UINT16 usPosY, UINT8 ubPageNum, FLOAT
 	ST::string sText = LoadAIMPolicyText(ubPageNum);
 
 	//Display the section number
-	sTemp = ST::format("{2.2f}", fNumber);
+	sTemp = ST::format("{:.2f}", fNumber);
 	DrawTextToScreen(sTemp, AIM_POLICY_SUBPARAGRAPH_NUMBER, usPosY, 0, AIM_POLICY_TEXT_FONT, AIM_POLICY_TEXT_COLOR, FONT_MCOLOR_BLACK, LEFT_JUSTIFIED);
 
 	//Display the text beside the section number
