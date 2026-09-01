@@ -27,9 +27,10 @@ jobs:
 
       - name: Import exact vanilla layout matches
         run: |
+          mkdir -p docs/generated
           python tools/korean/import_legacy_vanilla_data.py \
             --legacy-root "$RUNNER_TEMP/legacy-ja2-korean" \
-            --report korean-vanilla-data-import.json
+            --report docs/generated/korean-vanilla-data-import.json
 
       - name: Verify output against Stracciatella references
         run: |
@@ -37,7 +38,7 @@ jobs:
           import json
           from pathlib import Path
 
-          report = json.loads(Path('korean-vanilla-data-import.json').read_text(encoding='utf-8'))
+          report = json.loads(Path('docs/generated/korean-vanilla-data-import.json').read_text(encoding='utf-8'))
           for group in report['groups']:
               count = group['imported_count']
               if count <= 0:
@@ -54,16 +55,19 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: korean-vanilla-data-import
-          path: korean-vanilla-data-import.json
+          path: docs/generated/korean-vanilla-data-import.json
 
-      - name: Commit imported runtime text resources
+      - name: Commit imported runtime text resources and report
         run: |
-          git add assets/mods/korean-localization/data/BinaryData assets/mods/korean-localization/data/NPCData
+          git add \
+            assets/mods/korean-localization/data/BinaryData \
+            assets/mods/korean-localization/data/NPCData \
+            docs/generated/korean-vanilla-data-import.json
           if git diff --cached --quiet; then
-            echo 'No BinaryData/NPCData changes to commit.'
+            echo 'No BinaryData/NPCData/report changes to commit.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'feat(korean): import vanilla-compatible BinaryData and NPCData'
+          git commit -m 'docs(korean): persist vanilla data import report'
           git push origin HEAD:korean-localization
