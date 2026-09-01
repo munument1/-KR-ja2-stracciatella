@@ -42,5 +42,31 @@ jobs:
       - name: Validate all Korean classic EDT resources
         run: python tools/korean/validate_edt_layout.py --verbose --strict
 
+      - name: Verify IMP and recruited RPC runtime dialogue coverage
+        shell: python
+        run: |
+          from pathlib import Path
+
+          root = Path('assets/mods/korean-localization/data/MercEdt')
+          expected_sizes = {
+              **{f'{profile:03d}.EDT': 55200 for profile in range(51, 57)},
+              **{f'{profile:03d}.EDT': 38400 for profile in range(57, 62)},
+              '064.EDT': 38400,
+          }
+
+          missing = [name for name in expected_sizes if not (root / name).is_file()]
+          if missing:
+              raise SystemExit(f'Missing Korean IMP/RPC runtime dialogue files: {missing}')
+
+          wrong_sizes = [
+              (name, (root / name).stat().st_size, expected_size)
+              for name, expected_size in expected_sizes.items()
+              if (root / name).stat().st_size != expected_size
+          ]
+          if wrong_sizes:
+              raise SystemExit(f'IMP/RPC dialogue sizes differ from Stracciatella layouts: {wrong_sizes}')
+
+          print('IMP 051-056 and recruited RPC 057-061/064 runtime dialogue coverage is complete.')
+
       - name: Audit decoded Korean EDT text
         run: python tools/korean/audit_edt_text.py --fail-on-suspicious
