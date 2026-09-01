@@ -5,6 +5,9 @@ on:
     branches: [korean-localization]
     paths:
       - .github/workflows/korean-test-build.yml
+      - src/externalized/strings/Localization.cc
+      - assets/externalized/strings/*-kor.json
+      - tools/korean/validate_localization_strings.py
 
 permissions:
   contents: read
@@ -17,6 +20,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: korean-localization
+
+      - name: Validate Korean localization strings
+        shell: bash
+        run: python3 tools/korean/validate_localization_strings.py
+
+      - name: Verify Korean runtime suffix
+        shell: bash
+        run: grep -F 'case VanillaVersion::KOREAN:       return "-kor";' src/externalized/strings/Localization.cc
 
       - name: Set up mingw64 environment
         shell: bash
@@ -53,6 +64,8 @@ jobs:
             'JA2-Stracciatella Korean localization test build' \
             "Commit: $GITHUB_SHA" \
             '' \
+            'Korean externalized strings are enabled via the -kor localization suffix.' \
+            'Check New Game settings, Options, and main-menu copyright text.' \
             'Check IMP profiles 051-056 and recruited Ira profile 059.' \
             'MercEdt 040 and 046 were safely extended only across empty vanilla records.' \
             'MercEdt 200 is intentionally omitted because profile 200 is NO_PROFILE.' \
