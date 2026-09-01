@@ -92,6 +92,12 @@ def family_name(path: Path) -> str:
     return name[:-len("-eng.json")]
 
 
+def count_edt_files(directory: Path) -> int:
+    if not directory.is_dir():
+        return 0
+    return sum(1 for p in directory.iterdir() if p.is_file() and p.suffix.lower() == ".edt")
+
+
 def compare_family(eng_path: Path, kor_path: Path) -> dict[str, Any]:
     eng = load_json(eng_path)
     kor = load_json(kor_path)
@@ -167,14 +173,10 @@ def main() -> int:
             continue
         families.append(compare_family(eng_path, kor_path))
 
-    merc_dir = args.mod_dir / "MercEdt"
-    npc_dir = args.mod_dir / "NPCData"
-    binary_dir = args.mod_dir / "BinaryData"
-
     runtime = {
-        "MercEdt_count": len(list(merc_dir.glob("*.EDT"))) if merc_dir.exists() else 0,
-        "NPCData_count": len(list(npc_dir.glob("*.EDT"))) if npc_dir.exists() else 0,
-        "BinaryData_EDT_count": len(list(binary_dir.glob("*.EDT"))) if binary_dir.exists() else 0,
+        "MercEdt_count": count_edt_files(args.mod_dir / "MercEdt"),
+        "NPCData_count": count_edt_files(args.mod_dir / "NPCData"),
+        "BinaryData_EDT_count": count_edt_files(args.mod_dir / "BinaryData"),
     }
 
     totals = {
@@ -187,6 +189,9 @@ def main() -> int:
             for x in families
         ),
     }
+    totals["changed_percent"] = round(
+        100.0 * totals["translated"] / totals["translatable"], 2
+    ) if totals["translatable"] else 100.0
 
     report = {
         "missing_korean_files": missing_korean_files,
@@ -201,8 +206,8 @@ def main() -> int:
     for path in missing_korean_files:
         print(f"  MISSING {path}")
     print(
-        f"Externalized strings: {totals['translated']}/{totals['translatable']} changed from English; "
-        f"{totals['untranslated']} still identical to English"
+        f"Externalized strings: {totals['translated']}/{totals['translatable']} changed from English "
+        f"({totals['changed_percent']:.2f}%); {totals['untranslated']} still identical to English"
     )
     print(f"Placeholder mismatches: {totals['placeholder_mismatches']}")
     print(f"Structural mismatches: {totals['structural_mismatches']}")
