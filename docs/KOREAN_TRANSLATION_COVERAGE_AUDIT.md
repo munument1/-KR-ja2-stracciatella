@@ -2,6 +2,33 @@
 
 This document tracks translation areas that differ between the legacy JA2 1.13 Korean patch and JA2-Stracciatella.
 
+## Measured externalized-string snapshot
+
+The automated coverage audit passed structurally with the following measured result:
+
+- Korean string families missing: **0**
+- translatable externalized strings: **2,118**
+- strings changed from English: **199**
+- strings still identical to English: **1,919**
+- placeholder mismatches: **0**
+- structural mismatches: **0**
+
+Per family:
+
+| Family | Changed / total | Still English-identical |
+| --- | ---: | ---: |
+| `ammo-calibre-bobbyray` | 4 / 17 | 13 |
+| `ammo-calibre` | 4 / 17 | 13 |
+| `new-strings` | 5 / 5 | 0 |
+| `shipping-destinations` | 17 / 17 | 0 |
+| `strategic-map-land-types` | 39 / 39 | 0 |
+| `strategic-map-town-name-locatives` | 12 / 12 | 0 |
+| `strategic-map-town-names` | 12 / 12 | 0 |
+| `tooltips` | 105 / 109 | 4 |
+| `translation` | 1 / 1,890 | 1,889 |
+
+The dominant remaining externalized UI task is therefore `translation-kor.json`.
+
 ## Current findings
 
 ### 1. Externalized Stracciatella strings
@@ -24,32 +51,28 @@ Korean files currently present include:
 
 ### 2. Main UI translation is not yet complete
 
-`translation-kor.json` currently mirrors the English structure and still contains mostly English text. The existing 1.13 Korean translation corpus should be matched against `translation-eng.json` by English source text and then reviewed for context and placeholder compatibility.
+`translation-kor.json` currently mirrors the English structure and still contains mostly English text. The measured audit found only **1 of 1,890** translatable entries changed from English. The existing 1.13 Korean UI corpus should be matched against `translation-eng.json` by English source text and then reviewed for context and placeholder compatibility.
 
 Do not treat the mere presence of `translation-kor.json` as completion.
 
 ### 3. Mercenary dialogue
 
-The Korean localization mod currently contains only `MercEdt/000.EDT` as a committed runtime dialogue file.
+The Korean localization mod now contains **54 vanilla-compatible `MercEdt/*.EDT` files**, including `000.EDT`. They were imported only when the legacy Korean file exactly matched the Stracciatella vanilla reference size and were verified as 480-byte-record aligned before commit.
 
-The legacy Korean patch contains many more `MercEdt/*.EDT` files. These must be split into:
+Files not proven compatible remain excluded from the runtime mod.
 
-- vanilla-compatible files that can be reused directly after record-count validation;
-- files whose 1.13 record count differs from vanilla and therefore require record-level reconstruction;
-- 1.13-only profiles/files that must not be imported.
+Known audit result:
 
-Known prior audit result:
-
-- 54 files were identified as size/record-layout compatible with vanilla, including `000.EDT`;
+- 54 files are size/record-layout compatible with vanilla and are now imported;
 - 16 files require record-level handling: `005`, `032`, `040`, `046`, `051`-`061`, `064`;
 - known 1.13-only candidates include `062`, `149`, `165`-`169`, and `snitch/023`;
 - Stracciatella-only `200.EDT` currently has no Korean source and should keep English fallback until translated.
 
 ### 4. NPC dialogue
 
-The legacy Korean patch contains `Patch/Data/NPCData/*.EDT`, while the current Stracciatella Korean mod has no `NPCData` directory yet.
+The legacy Korean patch contains `Patch/Data/NPCData/*.EDT`. A safe importer now compares these only against Stracciatella's bundled vanilla localization reference by filename and exact byte size. `Patch/Data-1.13/NpcData` is never used.
 
-This is a major untranslated runtime area. Each file must be compared to the vanilla Stracciatella resource layout before import. Do not bulk-copy the 1.13 directory without validating record counts and profile mapping.
+Only exact-layout matches may be committed. Size mismatches remain excluded for record-level review.
 
 ### 5. BinaryData text resources
 
@@ -70,7 +93,7 @@ The legacy Korean patch contains translated `BinaryData` EDT resources such as:
 
 These cover web pages, help, IMP text, dossier/history material, flower shop text and other areas that will remain English until ported.
 
-Each file must be checked against vanilla record size/count before reuse.
+A safe importer now compares only `Patch/Data/BinaryData` against the Stracciatella vanilla reference by filename and exact byte size. `Patch/Data-1.13/BinaryData` is never used.
 
 ### 6. 1.13-only content must stay excluded
 
