@@ -1,0 +1,5 @@
+{
+  "name": "Korean Localization",
+  "description": "Korean localization resources for JA2 Stracciatella. This development mod will reuse the existing Jagged Alliance 2 Korean translation where compatible and provide Stracciatella-specific strings, translation tables, and fonts.",
+  "version": "0.0.1-dev"
+}
