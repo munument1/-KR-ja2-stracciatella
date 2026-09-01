@@ -15,12 +15,57 @@ from pathlib import Path
 from typing import Any, Iterable
 
 PLACEHOLDER_RE = re.compile(r"%(?:\d+\$)?[a-zA-Z]|\{[^{}]*\}")
+TRAILING_COMMA_RE = re.compile(r",(?=\s*[}\]])")
+
+
+def strip_json_comments(text: str) -> str:
+    """Remove // and /* */ comments without touching quoted strings."""
+    out: list[str] = []
+    i = 0
+    in_string = False
+    escaped = False
+    while i < len(text):
+        ch = text[i]
+        if in_string:
+            out.append(ch)
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            i += 1
+            continue
+
+        if ch == '"':
+            in_string = True
+            out.append(ch)
+            i += 1
+            continue
+
+        if ch == "/" and i + 1 < len(text):
+            nxt = text[i + 1]
+            if nxt == "/":
+                i += 2
+                while i < len(text) and text[i] not in "\r\n":
+                    i += 1
+                continue
+            if nxt == "*":
+                i += 2
+                while i + 1 < len(text) and text[i:i + 2] != "*/":
+                    i += 1
+                i += 2
+                continue
+
+        out.append(ch)
+        i += 1
+    return "".join(out)
 
 
 def load_json(path: Path) -> Any:
-    # Stracciatella JSON files may contain // comments.
     text = path.read_text(encoding="utf-8")
-    text = re.sub(r"(^|\s)//.*$", r"\1", text, flags=re.MULTILINE)
+    text = strip_json_comments(text)
+    text = TRAILING_COMMA_RE.sub("", text)
     return json.loads(text)
 
 
@@ -69,7 +114,6 @@ def compare_family(eng_path: Path, kor_path: Path) -> dict[str, Any]:
             continue
         if not isinstance(e, str):
             continue
-        # Empty strings and sentinel values are not counted as translation work.
         if not e or e.startswith("__"):
             continue
         translatable += 1
@@ -182,7 +226,6 @@ def main() -> int:
         args.json_out.parent.mkdir(parents=True, exist_ok=True)
         args.json_out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-    # Missing files and structural/placeholder mismatches are hard failures.
     if missing_korean_files or totals["placeholder_mismatches"] or totals["structural_mismatches"]:
         return 1
     return 0
