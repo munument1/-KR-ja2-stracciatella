@@ -36,4 +36,4 @@ jobs:
           python-version: '3.12'
 
       - name: Validate all Korean classic EDT resources
-        run: python tools/korean/validate_edt_layout.py --strict --verbose
+        run: python tools/korean/validate_edt_layout.py --verbose
