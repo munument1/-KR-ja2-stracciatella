@@ -2,7 +2,7 @@
 """Validate Korean externalized localization files against English sources.
 
 Checks:
-- JSON syntax
+- JSON/Stracciatella commented-JSON syntax
 - matching object keys
 - matching scalar/container types
 - matching list lengths
@@ -26,6 +26,58 @@ PRINTF_RE = re.compile(
     r"%(?:\d+\$)?[-+#0 ']*\d*(?:\.\d+)?[hljztL]*[diuoxXfFeEgGaAcspn]"
 )
 BRACE_RE = re.compile(r"(?<!\{)\{([^{}]*)\}(?!\})")
+TRAILING_COMMA_RE = re.compile(r",(?=\s*[}\]])")
+
+
+def strip_json_comments(text: str) -> str:
+    """Remove // and /* */ comments without touching quoted strings."""
+    out: list[str] = []
+    i = 0
+    in_string = False
+    escaped = False
+    while i < len(text):
+        ch = text[i]
+        if in_string:
+            out.append(ch)
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            i += 1
+            continue
+
+        if ch == '"':
+            in_string = True
+            out.append(ch)
+            i += 1
+            continue
+
+        if ch == "/" and i + 1 < len(text):
+            nxt = text[i + 1]
+            if nxt == "/":
+                i += 2
+                while i < len(text) and text[i] not in "\r\n":
+                    i += 1
+                continue
+            if nxt == "*":
+                i += 2
+                while i + 1 < len(text) and text[i:i + 2] != "*/":
+                    i += 1
+                i += 2
+                continue
+
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def load_json(path: Path) -> Any:
+    text = path.read_text(encoding="utf-8")
+    text = strip_json_comments(text)
+    text = TRAILING_COMMA_RE.sub("", text)
+    return json.loads(text)
 
 
 def printf_signature(text: str) -> Counter[str]:
@@ -107,11 +159,6 @@ def iter_pairs(strings_dir: Path, explicit: Iterable[Path] | None) -> list[tuple
             )
         pairs.append((eng, kor))
     return pairs
-
-
-def load_json(path: Path) -> Any:
-    with path.open("r", encoding="utf-8") as f:
-        return json.load(f)
 
 
 def main() -> int:
