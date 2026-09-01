@@ -119,6 +119,7 @@ def row_bytes(columns: tuple[int, ...]) -> int:
 
 
 def decrypt_rot1(code_unit: int) -> int:
+    # Mirrors LoadEncryptedString(): only values above ASCII '!' are shifted.
     return code_unit - 1 if code_unit > 33 else code_unit
 
 
@@ -130,6 +131,22 @@ def malformed_code_unit(code_unit: int) -> bool:
     )
 
 
+def unpack_field(data: bytes, offset: int, width_chars: int) -> tuple[int, ...]:
+    return struct.unpack_from(f"<{width_chars}H", data, offset)
+
+
+def first_nul(units: tuple[int, ...]) -> int | None:
+    try:
+        return units.index(0)
+    except ValueError:
+        return None
+
+
+def has_post_nul_data(units: tuple[int, ...]) -> bool:
+    terminator = first_nul(units)
+    return terminator is not None and any(units[terminator + 1 :])
+
+
 def validate_field(
     *,
     data: bytes,
@@ -139,35 +156,55 @@ def validate_field(
     row: int,
     column: int,
     issues: list[Issue],
+    reference_data: bytes | None = None,
+    reference_offset: int | None = None,
 ) -> None:
-    units = struct.unpack_from(f"<{width_chars}H", data, offset)
-    try:
-        terminator = units.index(0)
-        payload = units[:terminator]
-        padding = units[terminator + 1 :]
-        if any(padding):
-            issues.append(
-                Issue(
-                    "WARNING",
-                    path,
-                    "non-zero UTF-16 data appears after the first NUL terminator",
-                    row,
-                    column,
-                )
-            )
-    except ValueError:
+    units = unpack_field(data, offset, width_chars)
+    terminator = first_nul(units)
+
+    if terminator is None:
         # LoadEncryptedData() forcibly NUL-terminates the final code unit, so a
         # completely full field loses its final on-disk code unit at runtime.
         payload = units[:-1]
+        reference_full = False
+        if reference_data is not None and reference_offset is not None:
+            reference_units = unpack_field(reference_data, reference_offset, width_chars)
+            reference_full = first_nul(reference_units) is None
         issues.append(
             Issue(
-                "WARNING",
+                "INFO" if reference_full else "WARNING",
                 path,
-                "field has no on-disk NUL terminator; runtime will discard its final code unit",
+                (
+                    "field has no on-disk NUL terminator; the same full-width "
+                    "layout is present in the reference"
+                    if reference_full
+                    else "field has no on-disk NUL terminator; runtime will discard its final code unit"
+                ),
                 row,
                 column,
             )
         )
+    else:
+        payload = units[:terminator]
+        if has_post_nul_data(units):
+            inherited = False
+            if reference_data is not None and reference_offset is not None:
+                reference_units = unpack_field(reference_data, reference_offset, width_chars)
+                inherited = has_post_nul_data(reference_units)
+            issues.append(
+                Issue(
+                    "INFO" if inherited else "WARNING",
+                    path,
+                    (
+                        "non-zero UTF-16 data appears after the first NUL terminator; "
+                        "the same residue exists in the reference"
+                        if inherited
+                        else "non-zero UTF-16 data appears after the first NUL terminator; Korean-only residue"
+                    ),
+                    row,
+                    column,
+                )
+            )
 
     for idx, raw_unit in enumerate(payload):
         unit = decrypt_rot1(raw_unit)
@@ -282,6 +319,7 @@ def validate_group(
         stats.records += records
         stats.fields += records * len(columns)
 
+        reference_data: bytes | None = None
         if check_reference:
             ref = reference_index.get(path.name.casefold())
             if ref is None:
@@ -298,6 +336,8 @@ def validate_group(
                             f"size differs from vanilla-layout reference: korean={size}, reference={ref_size}",
                         )
                     )
+                else:
+                    reference_data = ref.read_bytes()
 
         data = path.read_bytes()
         for row in range(records):
@@ -311,6 +351,8 @@ def validate_group(
                     row=row,
                     column=column,
                     issues=issues,
+                    reference_data=reference_data,
+                    reference_offset=cursor if reference_data is not None else None,
                 )
                 cursor += width_chars * BYTES_PER_CHAR
 
@@ -342,13 +384,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--no-reference-check",
         action="store_true",
-        help="skip exact byte-size comparison with the bundled Simplified Chinese vanilla-layout reference",
+        help="skip exact byte-size/content-anomaly comparison with the bundled Simplified Chinese vanilla-layout reference",
     )
     parser.add_argument("--verbose", action="store_true", help="print every validated file")
     parser.add_argument(
         "--strict",
         action="store_true",
-        help="treat content warnings as failures in addition to structural errors",
+        help="treat Korean-only content warnings as failures in addition to structural errors",
     )
     return parser.parse_args()
 
@@ -387,6 +429,7 @@ def main() -> int:
 
     errors = [issue for issue in issues if issue.severity == "ERROR"]
     warnings = [issue for issue in issues if issue.severity == "WARNING"]
+    infos = [issue for issue in issues if issue.severity == "INFO"]
 
     if issues:
         print("Issues")
@@ -404,6 +447,7 @@ def main() -> int:
     print(f"  fields   : {totals.fields}")
     print(f"  errors   : {len(errors)}")
     print(f"  warnings : {len(warnings)}")
+    print(f"  info     : {len(infos)}")
 
     failed = bool(errors) or (args.strict and bool(warnings))
     print(f"  result   : {'FAIL' if failed else 'PASS'}")
