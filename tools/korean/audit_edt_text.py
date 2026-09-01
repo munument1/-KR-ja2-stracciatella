@@ -3,15 +3,13 @@
 
 The structural EDT validator proves that a file can be read safely, but structurally
 valid UTF-16 can still contain text imported with the wrong encoding. This tool
-mirrors Stracciatella's ROT-1 decode and reports suspicious script ranges that should
-not normally appear in a Korean localization (CJK ideographs, Japanese kana,
-Bopomofo, Cyrillic, private-use characters, and unexpected control codes).
+mirrors the Korean runtime path in LoadEncryptedData(): ROT-1 followed by the legacy
+Ivan-Dolvich Cyrillic repair used by all non-Russian resource versions.
 
-It is intentionally conservative: Hangul, ASCII, Latin/Latin-extended text, normal
-Unicode punctuation/symbols, and whitespace are accepted. Each finding includes the
-EDT file, row/column, code point, decoded Korean text, and the same decoded field from
-the bundled Simplified Chinese vanilla-layout reference when available. The reference
-is diagnostic only; it helps identify the intended meaning before changing game text.
+Hangul, ASCII, Latin/Latin-extended text, normal Unicode punctuation/symbols, and
+whitespace are accepted. CJK ideographs, Japanese kana, Bopomofo, Cyrillic,
+private-use characters, and unexpected control codes are reported, except for an
+exact allowlist of intentional foreign-language quotes inherited from vanilla JA2.
 """
 
 from __future__ import annotations
@@ -35,6 +33,16 @@ from validate_edt_layout import (
 )
 
 
+# Exact runtime-decoded foreign-language lines intentionally present in vanilla JA2.
+# Quote 73 is QUOTE_ME_TOO in Dialogue_Control.h. Ivan's vanilla EDT stores the
+# Russian "Я ТОЖЕ." through JA2's historical broken Cyrillic encoding; the engine
+# explicitly repairs that encoding in LoadEncryptedData(). Keep this exact guard so
+# any different Cyrillic text still fails the audit.
+INTENTIONAL_FOREIGN_TEXT: dict[tuple[str, str, int, int], str] = {
+    ("MercEdt", "007.edt", 73, 0): "Я ТОЖЕ.",
+}
+
+
 @dataclass(frozen=True)
 class Finding:
     group: str
@@ -50,7 +58,6 @@ class Finding:
 def classify_suspicious(ch: str) -> str | None:
     cp = ord(ch)
 
-    # C0/C1 controls are never expected inside displayed dialogue except TAB/LF/CR.
     if (cp < 0x20 and cp not in (0x09, 0x0A, 0x0D)) or 0x7F <= cp <= 0x9F:
         return "control"
 
@@ -81,15 +88,33 @@ def classify_suspicious(ch: str) -> str | None:
     return None
 
 
+def decode_korean_runtime_unit(raw_unit: int) -> int:
+    """Mirror the SE_NORMAL branch used by GameVersion::KOREAN."""
+    c = decrypt_rot1(raw_unit)
+
+    # LoadEncryptedData() repairs Ivan Dolvich's intentionally Russian lines in all
+    # non-Russian versions after the language-specific conversion block.
+    if 0x044D <= c <= 0x0452:  # encoded Cyrillic A .. IE
+        c += -0x044D + 0x0410
+    elif c == 0x0453:  # encoded Cyrillic IO
+        c = 0x0401
+    elif 0x0454 <= c <= 0x0467:  # encoded ZHE .. SHCHA
+        c += -0x0454 + 0x0416
+    elif 0x0468 <= c <= 0x046C:  # encoded YERU .. YA
+        c += -0x0468 + 0x042B
+
+    return c
+
+
 def decode_field(data: bytes, offset: int, width_chars: int) -> str:
     units = struct.unpack_from(f"<{width_chars}H", data, offset)
     try:
         end = units.index(0)
     except ValueError:
-        # Match LoadEncryptedData(): the runtime reserves the final unit for NUL.
+        # LoadEncryptedData() reserves the final unit for an in-memory NUL.
         end = max(0, len(units) - 1)
 
-    decoded = [decrypt_rot1(unit) for unit in units[:end]]
+    decoded = [decode_korean_runtime_unit(unit) for unit in units[:end]]
     return "".join(chr(unit) for unit in decoded)
 
 
@@ -101,9 +126,7 @@ def preview(text: str, limit: int = 120) -> str:
 
 
 def decode_reference_field(
-    *,
-    reference_root: Path,
-    finding: Finding,
+    *, reference_root: Path, finding: Finding
 ) -> str | None:
     columns = layout_for(finding.group, finding.path.name)
     if columns is None or finding.column >= len(columns):
@@ -112,7 +135,6 @@ def decode_reference_field(
     ref_dir = REFERENCE_DIRS[finding.group]
     ref_path = reference_root / ref_dir / finding.path.name
     if not ref_path.is_file():
-        # Preserve the validator's case-insensitive reference behavior.
         candidates = {p.name.casefold(): p for p in edt_files(reference_root / ref_dir)}
         ref_path = candidates.get(finding.path.name.casefold())
         if ref_path is None:
@@ -120,9 +142,7 @@ def decode_reference_field(
 
     data = ref_path.read_bytes()
     stride = row_bytes(columns)
-    if not data or len(data) % stride:
-        return None
-    if finding.row >= len(data) // stride:
+    if not data or len(data) % stride or finding.row >= len(data) // stride:
         return None
 
     offset = finding.row * stride
@@ -130,11 +150,12 @@ def decode_reference_field(
     return decode_field(data, offset, columns[finding.column])
 
 
-def scan_group(group: str, data_root: Path) -> tuple[int, int, list[Finding]]:
+def scan_group(group: str, data_root: Path) -> tuple[int, int, int, list[Finding]]:
     directory = data_root / group
     files = edt_files(directory)
     fields_scanned = 0
     chars_scanned = 0
+    intentional_records = 0
     findings: list[Finding] = []
 
     for path in files:
@@ -144,7 +165,6 @@ def scan_group(group: str, data_root: Path) -> tuple[int, int, list[Finding]]:
         stride = row_bytes(columns)
         data = path.read_bytes()
         if not data or len(data) % stride:
-            # Structural problems are the responsibility of validate_edt_layout.py.
             continue
 
         records = len(data) // stride
@@ -154,6 +174,14 @@ def scan_group(group: str, data_root: Path) -> tuple[int, int, list[Finding]]:
                 text = decode_field(data, cursor, width_chars)
                 fields_scanned += 1
                 chars_scanned += len(text)
+
+                allow_key = (group, path.name.casefold(), row, column)
+                allowed = INTENTIONAL_FOREIGN_TEXT.get(allow_key)
+                if allowed is not None and text == allowed:
+                    intentional_records += 1
+                    cursor += width_chars * BYTES_PER_CHAR
+                    continue
+
                 for index, ch in enumerate(text):
                     kind = classify_suspicious(ch)
                     if kind is not None:
@@ -162,7 +190,7 @@ def scan_group(group: str, data_root: Path) -> tuple[int, int, list[Finding]]:
                         )
                 cursor += width_chars * BYTES_PER_CHAR
 
-    return fields_scanned, chars_scanned, findings
+    return fields_scanned, chars_scanned, intentional_records, findings
 
 
 def parse_args() -> argparse.Namespace:
@@ -201,13 +229,12 @@ def main() -> int:
 
     repo_root = args.repo_root.resolve()
     data_root = repo_root / "assets" / "mods" / "korean-localization" / "data"
-    reference_root = (
-        repo_root / "assets" / "mods" / "simplified-chinese-localization" / "data"
-    )
+    reference_root = repo_root / "assets" / "mods" / "simplified-chinese-localization" / "data"
     groups = args.group or list(EXPECTED_COUNTS)
 
     total_fields = 0
     total_chars = 0
+    total_intentional = 0
     findings: list[Finding] = []
 
     print(f"Korean EDT root: {data_root}")
@@ -216,13 +243,14 @@ def main() -> int:
     print()
 
     for group in groups:
-        fields, chars, group_findings = scan_group(group, data_root)
+        fields, chars, intentional, group_findings = scan_group(group, data_root)
         total_fields += fields
         total_chars += chars
+        total_intentional += intentional
         findings.extend(group_findings)
         print(
             f"{group}: fields={fields}, decoded_chars={chars}, "
-            f"suspicious_chars={len(group_findings)}"
+            f"intentional_foreign={intentional}, suspicious_chars={len(group_findings)}"
         )
 
     if findings:
@@ -236,16 +264,14 @@ def main() -> int:
             name = unicodedata.name(finding.char, "UNNAMED")
             print(
                 f"  {rel} row={finding.row} col={finding.column} char={finding.index} "
-                f"U+{ord(finding.char):04X} {finding.kind} ({name}): "
-                f"{preview(finding.text)}"
+                f"U+{ord(finding.char):04X} {finding.kind} ({name}): {preview(finding.text)}"
             )
 
             key = (finding.group, finding.path.as_posix(), finding.row, finding.column)
             if key not in shown_reference_records:
                 shown_reference_records.add(key)
                 reference_text = decode_reference_field(
-                    reference_root=reference_root,
-                    finding=finding,
+                    reference_root=reference_root, finding=finding
                 )
                 if reference_text is not None:
                     print(f"    reference: {preview(reference_text)}")
@@ -258,18 +284,17 @@ def main() -> int:
         for kind, count in sorted(counts.items(), key=lambda item: (-item[1], item[0])):
             print(f"  {kind:<32} {count}")
 
-    affected_records = {
-        (f.group, f.path.as_posix(), f.row, f.column) for f in findings
-    }
+    affected_records = {(f.group, f.path.as_posix(), f.row, f.column) for f in findings}
     affected_files = {f.path.as_posix() for f in findings}
 
     print("\nSummary")
-    print(f"  fields scanned     : {total_fields}")
-    print(f"  decoded characters : {total_chars}")
-    print(f"  suspicious chars   : {len(findings)}")
-    print(f"  affected records   : {len(affected_records)}")
-    print(f"  affected files     : {len(affected_files)}")
-    print(f"  result             : {'SUSPICIOUS' if findings else 'PASS'}")
+    print(f"  fields scanned      : {total_fields}")
+    print(f"  decoded characters  : {total_chars}")
+    print(f"  intentional foreign : {total_intentional}")
+    print(f"  suspicious chars    : {len(findings)}")
+    print(f"  affected records    : {len(affected_records)}")
+    print(f"  affected files      : {len(affected_files)}")
+    print(f"  result              : {'SUSPICIOUS' if findings else 'PASS'}")
 
     if args.fail_on_suspicious and findings:
         return 1
