@@ -1,0 +1,39 @@
+name: Validate Korean EDT layouts
+
+on:
+  push:
+    branches:
+      - korean-localization
+    paths:
+      - 'assets/mods/korean-localization/data/**/*.EDT'
+      - 'assets/mods/korean-localization/data/**/*.edt'
+      - 'assets/mods/simplified-chinese-localization/data/**/*.EDT'
+      - 'assets/mods/simplified-chinese-localization/data/**/*.edt'
+      - 'tools/korean/validate_edt_layout.py'
+      - '.github/workflows/korean-edt-layout.yml'
+  pull_request:
+    branches:
+      - korean-localization
+    paths:
+      - 'assets/mods/korean-localization/data/**/*.EDT'
+      - 'assets/mods/korean-localization/data/**/*.edt'
+      - 'assets/mods/simplified-chinese-localization/data/**/*.EDT'
+      - 'assets/mods/simplified-chinese-localization/data/**/*.edt'
+      - 'tools/korean/validate_edt_layout.py'
+      - '.github/workflows/korean-edt-layout.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Korean localization branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate all Korean classic EDT resources
+        run: python tools/korean/validate_edt_layout.py --strict --verbose
