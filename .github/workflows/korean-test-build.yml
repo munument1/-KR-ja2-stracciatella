@@ -27,7 +27,8 @@ jobs:
 
       - name: Verify Korean runtime suffix
         shell: bash
-        run: grep -F 'case VanillaVersion::KOREAN:       return "-kor";' src/externalized/strings/Localization.cc
+        run: |
+          grep -F 'case VanillaVersion::KOREAN:       return "-kor";' src/externalized/strings/Localization.cc
 
       - name: Set up mingw64 environment
         shell: bash
