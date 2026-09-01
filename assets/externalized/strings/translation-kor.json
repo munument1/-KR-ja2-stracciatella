@@ -1228,56 +1228,56 @@
         "-3"
     ],
     "pMapErrorString": [
-        "Squad can't move with a sleeping merc on it.",
-        "Move the squad above ground first.",
-        "Movement orders? It's a hostile sector!",
-        "Mercs must be assigned to a squad or vehicle in order to travel.",
-        "You don't have any team members yet.",
-        "Merc can't comply.",
-        "%s needs an escort to move. Place him on a squad with one.",
-        "%s needs an escort to move. Place her on a squad with one.",
-        "Merc hasn't yet arrived in Arulco!",
-        "Looks like there's some contract negotiations to settle first.",
+        "잠든 용병이 있는 분대는 이동할 수 없습니다.",
+        "먼저 분대를 지상으로 이동시키십시오.",
+        "이동 명령을 내릴 수 없습니다. 적대 구역입니다!",
+        "이동하려면 용병을 분대나 차량에 배치해야 합니다.",
+        "아직 팀원이 없습니다.",
+        "용병이 명령을 수행할 수 없습니다.",
+        "%s은(는) 이동하려면 호위가 필요합니다. 호위 가능한 용병이 있는 분대에 배치하십시오.",
+        "%s은(는) 이동하려면 호위가 필요합니다. 호위 가능한 용병이 있는 분대에 배치하십시오.",
+        "용병이 아직 아룰코에 도착하지 않았습니다!",
+        "먼저 계약 협상을 해결해야 할 것 같습니다.",
         "",
-        "Movement orders? There's a battle going on!",
-        "You have been ambushed by bloodcats in sector %s!",
-        "You have just entered what appears to be a bloodcat lair in sector I16!",
+        "이동 명령을 내릴 수 없습니다. 전투가 진행 중입니다!",
+        "%s 구역에서 블러드캣의 매복을 당했습니다!",
+        "I16 구역의 블러드캣 소굴로 보이는 곳에 들어왔습니다!",
         "",
-        "The SAM site in %s has been taken over.",
-        "The mine in %s has been taken over. Your daily income has been reduced to %s per day.",
-        "The enemy has taken over sector %s uncontested.",
-        "At least one of your mercs could not be put on this assignment.",
-        "%s could not join %s as it is already full",
-        "%s could not join %s as it is too far away.",
-        "The mine in %s has been captured by Deidranna's forces!",
-        "Deidranna's forces have just invaded the SAM site in %s",
-        "Deidranna's forces have just invaded %s",
-        "Deidranna's forces have just been spotted in %s.",
-        "Deidranna's forces have just taken over %s.",
-        "At least one of your mercs could not be put asleep.",
-        "At least one of your mercs could not be woken up.",
-        "Militia will not appear until they have finished training.",
-        "%s cannot be given movement orders at this time.",
-        "Militia that are not within town boundaries cannot be moved to another sector.",
-        "You can't have militia in %s.",
-        "A vehicle can't move while empty!",
-        "%s is too injured to travel!",
-        "You must leave the museum first!",
-        "%s is dead!",
-        "%s can't switch to %s because it's moving",
-        "%s can't enter the vehicle that way",
-        "%s can't join %s",
-        "You can't compress time until you hire some new mercs!",
-        "This vehicle can only travel along roads!",
-        "You can't reassign mercs who are on the move",
-        "Vehicle is out of gas!",
-        "%s is too tired to travel.",
-        "Nobody aboard is able to drive the vehicle.",
-        "One or more members of this squad can't move right now.",
-        "One or more of the OTHER mercs can't move right now.",
-        "Vehicle is too damaged!",
-        "Note that only two mercs may train militia in each sector.",
-        "The robot can't move without its controller. Place them together in the same squad."
+        "%s의 SAM 기지가 점령당했습니다.",
+        "%s의 광산이 점령당했습니다. 일일 수입이 하루 %s(으)로 감소했습니다.",
+        "적이 %s 구역을 저항 없이 점령했습니다.",
+        "한 명 이상의 용병을 이 임무에 배치할 수 없었습니다.",
+        "%s은(는) %s이(가) 이미 가득 차 합류할 수 없습니다.",
+        "%s은(는) 너무 멀리 있어 %s에 합류할 수 없습니다.",
+        "%s의 광산이 데이드라나의 군대에 점령당했습니다!",
+        "데이드라나의 군대가 %s의 SAM 기지를 침공했습니다.",
+        "데이드라나의 군대가 %s을(를) 침공했습니다.",
+        "데이드라나의 군대가 %s에서 발견되었습니다.",
+        "데이드라나의 군대가 %s을(를) 점령했습니다.",
+        "한 명 이상의 용병을 재울 수 없었습니다.",
+        "한 명 이상의 용병을 깨울 수 없었습니다.",
+        "민병대는 훈련이 끝나기 전까지 나타나지 않습니다.",
+        "%s에게는 지금 이동 명령을 내릴 수 없습니다.",
+        "마을 경계 밖의 민병대는 다른 구역으로 이동시킬 수 없습니다.",
+        "%s에는 민병대를 배치할 수 없습니다.",
+        "빈 차량은 이동할 수 없습니다!",
+        "%s은(는) 부상이 너무 심해 이동할 수 없습니다!",
+        "먼저 박물관을 나가야 합니다!",
+        "%s은(는) 사망했습니다!",
+        "%s은(는) 이동 중이라 %s(으)로 전환할 수 없습니다.",
+        "%s은(는) 그 방향으로 차량에 탑승할 수 없습니다.",
+        "%s은(는) %s에 합류할 수 없습니다.",
+        "새 용병을 고용하기 전에는 시간을 빠르게 돌릴 수 없습니다!",
+        "이 차량은 도로를 통해서만 이동할 수 있습니다!",
+        "이동 중인 용병은 재배치할 수 없습니다.",
+        "차량의 연료가 바닥났습니다!",
+        "%s은(는) 너무 지쳐 이동할 수 없습니다.",
+        "탑승자 중 차량을 운전할 수 있는 사람이 없습니다.",
+        "이 분대의 한 명 이상이 지금 이동할 수 없습니다.",
+        "다른 용병 중 한 명 이상이 지금 이동할 수 없습니다.",
+        "차량이 너무 심하게 손상되었습니다!",
+        "각 구역에서 민병대를 훈련할 수 있는 용병은 두 명뿐입니다.",
+        "로봇은 조종자 없이 이동할 수 없습니다. 같은 분대에 함께 배치하십시오."
     ],
     "pMapHortIndex": [
         "X",
@@ -1299,65 +1299,65 @@
         "16"
     ],
     "pMapInventoryErrorString": [
-        "Can't select that merc.",
-        "%s isn't in the sector to take that item.",
-        "During combat, you'll have to pick up items manually.",
-        "During combat, you'll have to drop items manually.",
-        "%s isn't in the sector to drop that item."
+        "그 용병은 선택할 수 없습니다.",
+        "%s은(는) 그 아이템을 가져갈 수 있는 구역에 없습니다.",
+        "전투 중에는 아이템을 직접 주워야 합니다.",
+        "전투 중에는 아이템을 직접 내려놓아야 합니다.",
+        "%s은(는) 그 아이템을 내려놓을 수 있는 구역에 없습니다."
     ],
     "pMapInventoryStrings": [
-        "Location",
-        "Total Items"
+        "위치",
+        "총 아이템 수"
     ],
     "pMapPlotStrings": [
-        "Click again on the destination to confirm your final route, or click on another sector to place more waypoints.",
-        "Travel route confirmed.",
-        "Destination unchanged.",
-        "Travel route canceled.",
-        "Travel route shortened."
+        "최종 경로를 확정하려면 목적지를 다시 클릭하거나, 다른 구역을 클릭해 경유지를 더 지정하십시오.",
+        "이동 경로가 확정되었습니다.",
+        "목적지는 변경되지 않았습니다.",
+        "이동 경로가 취소되었습니다.",
+        "이동 경로가 단축되었습니다."
     ],
     "pMapPopUpInventoryText": [
-        "Inventory",
-        "Exit"
+        "인벤토리",
+        "나가기"
     ],
     "pMapScreenBorderButtonHelpText": [
-        "Show To|wns",
-        "Show |Mines",
-        "Show |Teams & Enemies",
-        "Show |Airspace",
-        "Show |Items",
-        "Show Militia & Enemies (|Z)"
+        "마을 표시 (|W)",
+        "광산 표시 (|M)",
+        "팀과 적 표시 (|T)",
+        "영공 표시 (|A)",
+        "아이템 표시 (|I)",
+        "민병대와 적 표시 (|Z)"
     ],
     "pMapScreenBottomFastHelp": [
-        "|Laptop",
-        "Tactical (|E|s|c)",
-        "|Options",
-        "Time Compress (|+)",
-        "Time Compress (|-)",
-        "Previous Message (|U|p)\nPrevious Page (|P|g|U|p)",
-        "Next Message (|D|o|w|n)\nNext Page (|P|g|D|n)",
-        "Start/Stop Time (|S|p|a|c|e)"
+        "노트북 (|L)",
+        "전술 화면 (|E|s|c)",
+        "옵션 (|O)",
+        "시간 가속 (|+)",
+        "시간 감속 (|-)",
+        "이전 메시지 (|U|p)\n이전 페이지 (|P|g|U|p)",
+        "다음 메시지 (|D|o|w|n)\n다음 페이지 (|P|g|D|n)",
+        "시간 시작/정지 (|S|p|a|c|e)"
     ],
-    "pMapScreenBottomText": "Current Balance",
-    "pMapScreenJustStartedHelpText": "Go to AIM and hire some mercs ( *Hint* it's in the Laptop )",
+    "pMapScreenBottomText": "현재 잔액",
+    "pMapScreenJustStartedHelpText": "A.I.M.에서 용병을 고용하십시오. (*힌트* 노트북에 있습니다.)",
     "pMapScreenMouseRegionHelpText": [
-        "Select Character",
-        "Assign Merc",
-        "Plot Travel Route",
-        "Merc |Contract",
-        "Remove Merc",
-        "Sleep"
+        "인물 선택",
+        "용병 임무 배정",
+        "이동 경로 설정",
+        "용병 계약",
+        "용병 제거",
+        "수면"
     ],
     "pMapScreenPrevNextCharButtonHelpText": [
-        "Previous Merc (|L|e|f|t)",
-        "Next Merc (|R|i|g|h|t)"
+        "이전 용병 (|L|e|f|t)",
+        "다음 용병 (|R|i|g|h|t)"
     ],
     "pMapScreenStatusStrings": [
-        "Health",
-        "Energy",
-        "Morale",
-        "Condition",
-        "Fuel"
+        "체력",
+        "기력",
+        "사기",
+        "상태",
+        "연료"
     ],
     "pMapVertIndex": [
         "X",
@@ -1378,7 +1378,7 @@
         "O",
         "P"
     ],
-    "pMercDeadString": "%s is dead.",
+    "pMercDeadString": "%s은(는) 사망했습니다.",
     "pMessageStrings": [
         "Exit Game?",
         "OK",
@@ -1450,156 +1450,156 @@
         "History log updated."
     ],
     "pMilitiaButtonString": [
-        "Auto",
-        "Done"
+        "자동",
+        "완료"
     ],
     "pMilitiaButtonsHelpText": [
-        "Pick up(Right Click)/drop(Left Click) Green Troops",
-        "Pick up(Right Click)/drop(Left Click) Regular Troops",
-        "Pick up(Right Click)/drop(Left Click) Veteran Troops",
-        "Distribute available militia equally among all sectors"
+        "신병 민병대 집기(오른쪽 클릭)/놓기(왼쪽 클릭)",
+        "일반 민병대 집기(오른쪽 클릭)/놓기(왼쪽 클릭)",
+        "정예 민병대 집기(오른쪽 클릭)/놓기(왼쪽 클릭)",
+        "가용 민병대를 모든 구역에 균등하게 분배"
     ],
     "pMilitiaConfirmStrings": [
-        "Training a squad of town militia will cost $",
-        "Approve expenditure?",
-        "You can't afford it.",
-        "Continue training militia in %s (%s %d)?",
-        "Cost $",
+        "마을 민병대 한 분대를 훈련하는 비용은 $",
+        "비용을 승인하시겠습니까?",
+        "비용을 감당할 수 없습니다.",
+        "%s에서 민병대 훈련을 계속하시겠습니까? (%s %d)",
+        "비용 $",
         "( Y/N )",
-        "Training town militia in %d sectors will cost $ %d. %s",
-        "You cannot afford the $%d to train town militia here.",
-        "%s needs a loyalty of %d percent for you to be able to continue training militia.",
-        "You cannot train the militia in %s any further."
+        "%d개 구역의 마을 민병대 훈련 비용은 $ %d입니다. %s",
+        "이곳에서 민병대를 훈련하는 데 필요한 $%d을(를) 감당할 수 없습니다.",
+        "%s의 충성도가 %d%% 이상이어야 민병대 훈련을 계속할 수 있습니다.",
+        "%s에서는 더 이상 민병대를 훈련할 수 없습니다."
     ],
     "pMilitiaString": [
-        "Militia",
-        "Unassigned",
-        "You can't redistribute militia while there are hostilities in the area!"
+        "민병대",
+        "미배치",
+        "지역에 적대 행위가 진행 중일 때는 민병대를 재배치할 수 없습니다!"
     ],
     "pMiscMapScreenMouseRegionHelpText": [
-        "Enter Inventory (|E|n|t|e|r)",
-        "Throw Item Away",
-        "Exit Inventory (|E|n|t|e|r)"
+        "인벤토리 열기 (|E|n|t|e|r)",
+        "아이템 버리기",
+        "인벤토리 닫기 (|E|n|t|e|r)"
     ],
     "pMoralStrings": [
-        "Great",
-        "Good",
-        "Stable",
-        "Poor",
-        "Panic",
-        "Bad"
+        "최고",
+        "좋음",
+        "안정",
+        "저조",
+        "공황",
+        "나쁨"
     ],
     "pMovementMenuStrings": [
-        "Move Mercs In Sector %s",
-        "Plot Travel Route",
-        "Cancel",
-        "Other"
+        "%s 구역의 용병 이동",
+        "이동 경로 설정",
+        "취소",
+        "기타"
     ],
-    "pNewMailStrings": "You have new mail...",
+    "pNewMailStrings": "새 메일이 도착했습니다...",
     "pNewNoiseStr": [
-        "%s hears a %s sound coming from %s.",
-        "%s hears a %s sound of MOVEMENT coming from %s.",
-        "%s hears a %s CREAKING coming from %s.",
-        "%s hears a %s SPLASHING coming from %s.",
-        "%s hears a %s IMPACT coming from %s.",
-        "%s hears a %s EXPLOSION to %s.",
-        "%s hears a %s SCREAM to %s.",
-        "%s hears a %s IMPACT to %s.",
-        "%s hears a %s IMPACT to %s.",
-        "%s hears a %s SHATTERING coming from %s.",
-        "%s hears a %s SMASH coming from %s."
+        "%s이(가) %s 소리가 %s에서 나는 것을 들었습니다.",
+        "%s이(가) %s 크기의 움직이는 소리를 %s에서 들었습니다.",
+        "%s이(가) %s 크기의 삐걱거리는 소리를 %s에서 들었습니다.",
+        "%s이(가) %s 크기의 물 튀는 소리를 %s에서 들었습니다.",
+        "%s이(가) %s 크기의 충격음을 %s에서 들었습니다.",
+        "%s이(가) %s 크기의 폭발음을 %s 쪽에서 들었습니다.",
+        "%s이(가) %s 크기의 비명을 %s 쪽에서 들었습니다.",
+        "%s이(가) %s 크기의 충격음을 %s 쪽에서 들었습니다.",
+        "%s이(가) %s 크기의 충격음을 %s 쪽에서 들었습니다.",
+        "%s이(가) %s 크기의 깨지는 소리를 %s에서 들었습니다.",
+        "%s이(가) %s 크기의 부서지는 소리를 %s에서 들었습니다."
     ],
     "pNoiseTypeStr": [
-        "UNKNOWN",
-        "sound of MOVEMENT",
-        "CREAKING",
-        "SPLASHING",
-        "IMPACT",
-        "GUNSHOT",
-        "EXPLOSION",
-        "SCREAM",
-        "IMPACT",
-        "IMPACT",
-        "SHATTERING",
-        "SMASH"
+        "알 수 없는 소리",
+        "움직이는 소리",
+        "삐걱거림",
+        "물 튀는 소리",
+        "충격음",
+        "총성",
+        "폭발음",
+        "비명",
+        "충격음",
+        "충격음",
+        "깨지는 소리",
+        "부서지는 소리"
     ],
     "pNoiseVolStr": [
-        "FAINT",
-        "DEFINITE",
-        "LOUD",
-        "VERY LOUD"
+        "희미한",
+        "분명한",
+        "큰",
+        "매우 큰"
     ],
     "pPOWStrings": [
-        "POW",
+        "포로",
         "??"
     ],
     "pPausedGameText": [
-        "Game Paused",
-        "Resume Game (|P|a|u|s|e)",
-        "Pause Game (|P|a|u|s|e)"
+        "게임 일시정지",
+        "게임 재개 (|P|a|u|s|e)",
+        "게임 일시정지 (|P|a|u|s|e)"
     ],
-    "pPersTitleText": "Personnel Manager",
+    "pPersTitleText": "인사 관리",
     "pPersonelTeamStrings": [
-        "Current Team",
-        "Departures",
-        "Daily Cost:",
-        "Highest Cost:",
-        "Lowest Cost:",
-        "Killed in Action:",
-        "Dismissed:",
-        "Other:"
+        "현재 팀",
+        "이탈자",
+        "일일 비용:",
+        "최고 비용:",
+        "최저 비용:",
+        "전사:",
+        "해고:",
+        "기타:"
     ],
     "pPersonnelCurrentTeamStatsStrings": [
-        "Lowest",
-        "Average",
-        "Highest"
+        "최저",
+        "평균",
+        "최고"
     ],
     "pPersonnelDepartedStateStrings": [
-        "Killed in Action",
-        "Dismissed",
-        "Married",
-        "Contract Expired",
-        "Quit"
+        "전사",
+        "해고",
+        "결혼",
+        "계약 만료",
+        "퇴사"
     ],
     "pPersonnelScreenStrings": [
-        "Medical Deposit:",
-        "Remaining Contract:",
-        "Kills",
-        "Assists",
-        "Daily Cost:",
-        "Total Cost to Date:",
-        "Contract:",
-        "Total Service to Date:",
-        "Salary Owing:",
-        "Hit Percentage:",
-        "Battles",
-        "Times Wounded",
-        "Skills:",
-        "No Skills"
+        "의료 보증금:",
+        "남은 계약 기간:",
+        "처치",
+        "지원",
+        "일일 비용:",
+        "현재까지 총비용:",
+        "계약:",
+        "현재까지 복무 기간:",
+        "미지급 급여:",
+        "명중률:",
+        "전투 횟수",
+        "부상 횟수",
+        "특기:",
+        "특기 없음"
     ],
-    "pPersonnelString": "Mercs:",
+    "pPersonnelString": "용병:",
     "pPersonnelTeamStatsStrings": [
-        "HLTH",
-        "AGI",
-        "DEX",
-        "STR",
-        "LDR",
-        "WIS",
-        "LVL",
-        "MRKM",
-        "MECH",
-        "EXPL",
-        "MED"
+        "체력",
+        "민첩",
+        "손재주",
+        "힘",
+        "통솔",
+        "지혜",
+        "레벨",
+        "사격",
+        "기계",
+        "폭발",
+        "의술"
     ],
     "pRemoveMercStrings": [
-        "Remove Merc",
-        "Cancel"
+        "용병 제거",
+        "취소"
     ],
     "pRepairStrings": [
-        "Items",
-        "SAM Site",
-        "Cancel",
-        "Robot"
+        "아이템",
+        "SAM 기지",
+        "취소",
+        "로봇"
     ],
     "pSenderNameList": [
         "Enrico",
