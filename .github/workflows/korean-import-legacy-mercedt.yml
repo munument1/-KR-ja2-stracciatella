@@ -1,0 +1,57 @@
+name: Import vanilla-compatible Korean MercEdt
+
+on:
+  push:
+    branches:
+      - korean-localization
+    paths:
+      - '.github/workflows/korean-import-legacy-mercedt.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Stracciatella Korean branch
+        uses: actions/checkout@v4
+        with:
+          ref: korean-localization
+          fetch-depth: 1
+
+      - name: Checkout legacy JA2 1.13 Korean patch
+        run: |
+          git clone --depth 1 https://github.com/munument1/Jagged-Alliance2-korean.git "$RUNNER_TEMP/legacy-ja2-korean"
+
+      - name: Import only vanilla-compatible MercEdt files
+        run: |
+          python tools/korean/import_legacy_edt.py \
+            --legacy-root "$RUNNER_TEMP/legacy-ja2-korean"
+
+      - name: Verify imported EDT record alignment
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          root = Path('assets/mods/korean-localization/data/MercEdt')
+          files = sorted(root.glob('*.EDT'))
+          bad = [(p.name, p.stat().st_size) for p in files if p.stat().st_size % 480]
+          if bad:
+              raise SystemExit(f'EDT files not aligned to 480-byte records: {bad}')
+          if len(files) != 54:
+              raise SystemExit(f'Expected 54 vanilla-compatible Korean MercEdt files including 000.EDT, found {len(files)}')
+          print(f'Validated {len(files)} MercEdt files; every file is 480-byte record aligned.')
+          PY
+
+      - name: Commit imported runtime dialogue
+        run: |
+          if git diff --quiet -- assets/mods/korean-localization/data/MercEdt; then
+            echo 'No MercEdt changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/mods/korean-localization/data/MercEdt
+          git commit -m 'feat(korean): import vanilla-compatible MercEdt translations'
+          git push origin HEAD:korean-localization
