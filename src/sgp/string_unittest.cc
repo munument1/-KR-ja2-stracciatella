@@ -90,3 +90,21 @@ TEST(stringTest, Korean)
 	EXPECT_EQ(u32[5], char32_t(0xC2A4)); // 스
 	EXPECT_EQ(u32[6], char32_t(0xD2B8)); // 트
 }
+
+TEST(stringTest, KoreanMercEdtQuote0)
+{
+	const ST::string str = "하하 적군이 왔군!";
+	auto u32 = str.to_utf32();
+	ASSERT_EQ(u32.size(), 10u);
+	EXPECT_EQ(u32[0], char32_t(0xD558)); // 하
+	EXPECT_EQ(u32[1], char32_t(0xD558)); // 하
+	EXPECT_EQ(u32[2], char32_t(0x0020)); // ' '
+	EXPECT_EQ(u32[3], char32_t(0xC801)); // 적
+	EXPECT_EQ(u32[4], char32_t(0xAD60)); // 군
+	EXPECT_EQ(u32[5], char32_t(0xC774)); // 이
+	EXPECT_EQ(u32[6], char32_t(0x0020)); // ' '
+	EXPECT_EQ(u32[7], char32_t(0xC654)); // 왔
+	EXPECT_EQ(u32[8], char32_t(0xAD70)); // 군
+	EXPECT_EQ(u32[9], char32_t(0x0021)); // !
+}
+
