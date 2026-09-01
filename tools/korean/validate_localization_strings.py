@@ -81,9 +81,24 @@ def load_json(path: Path) -> Any:
 
 
 def printf_signature(text: str) -> Counter[str]:
-    """Return printf conversion types while ignoring literal %%."""
+    """Return printf conversion types while ignoring literal percent prose.
+
+    C printf permits a space flag (for example ``% d``), which means a naive
+    regex also sees the prose ``% Functional`` as a ``% F`` conversion.  When
+    a whitespace-containing candidate is immediately followed by another
+    alphabetic character, treat it as ordinary prose instead.  Real JA2
+    placeholders such as ``%s``, ``%d`` and ``% d`` remain validated.
+    """
     scrubbed = text.replace("%%", "")
-    return Counter(match.group(0)[-1] for match in PRINTF_RE.finditer(scrubbed))
+    conversions: list[str] = []
+    for match in PRINTF_RE.finditer(scrubbed):
+        token = match.group(0)
+        if any(ch.isspace() for ch in token):
+            next_char = scrubbed[match.end():match.end() + 1]
+            if next_char and next_char.isalpha():
+                continue
+        conversions.append(token[-1])
+    return Counter(conversions)
 
 
 def brace_signature(text: str) -> Counter[str]:
