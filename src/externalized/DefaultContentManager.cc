@@ -1329,6 +1329,9 @@ void DefaultContentManager::loadTranslationTable()
 	case GameVersion::SIMPLIFIED_CHINESE:
 		suffix = "chs";
 		break;
+	case GameVersion::KOREAN:
+		suffix = "kor";
+		break;
 	default:
 		suffix = "eng";
 		break;

@@ -169,26 +169,29 @@ def render_hangul_glyph(
     target_height: int,
     add_shadow: bool,
 ) -> tuple[int, int, bytes]:
-    bbox = font.getbbox(ch)
+    canvas_size = max(64, target_height * 2)
+    canvas = Image.new("L", (canvas_size, canvas_size), 0)
+    draw = ImageDraw.Draw(canvas)
+    draw.text((0, 0), ch, font=font, fill=255)
+    bbox = canvas.getbbox()
+
     if bbox is None:
-        raise ValueError(f"font has no bounding box for U+{ord(ch):04X}")
+        raise ValueError(f"font rendered an empty glyph for U+{ord(ch):04X}")
+
     left, top, right, bottom = bbox
     glyph_width = max(1, right - left)
     glyph_height = max(1, bottom - top)
+
     advance = max(1, int(math.ceil(font.getlength(ch))))
 
-    # Leave one pixel for the built-in JA2 shadow when enabled.
     width = max(glyph_width, advance) + (1 if add_shadow else 0)
-    if glyph_height > target_height:
-        raise ValueError(
-            f"U+{ord(ch):04X} rendered height {glyph_height} exceeds target height {target_height}"
-        )
+
+    crop = canvas.crop(bbox)
 
     mask = Image.new("L", (width, target_height), 0)
-    draw = ImageDraw.Draw(mask)
-    x = max(0, -left)
-    y = max(0, (target_height - glyph_height) // 2 - top)
-    draw.text((x, y), ch, font=font, fill=255)
+    x = max(0, (width - (1 if add_shadow else 0) - glyph_width) // 2)
+    y = max(0, (target_height - glyph_height) // 2)
+    mask.paste(crop, (x, y))
     pixels = mask.load()
 
     indexed = [[TRANSPARENT_PIXEL] * width for _ in range(target_height)]
@@ -218,11 +221,36 @@ def fit_font(ttf_path: Path, target_height: int, scale: float) -> ImageFont.Free
     """Choose the largest pixel size whose representative Hangul glyph fits."""
     start = max(1, int(round(target_height * scale)))
     for size in range(start, 0, -1):
-        font = ImageFont.truetype(str(ttf_path), size=size)
-        bbox = font.getbbox("한")
-        if bbox is not None and bbox[3] - bbox[1] <= target_height:
+        try:
+            font = ImageFont.truetype(str(ttf_path), size=size)
+        except (OSError, ValueError):
+            continue
+        canvas = Image.new("L", (100, 100), 0)
+        draw = ImageDraw.Draw(canvas)
+        draw.text((0, 0), "한", font=font, fill=255)
+        bbox = canvas.getbbox()
+        if bbox is not None and (bbox[3] - bbox[1]) <= target_height:
             return font
-    raise ValueError(f"could not fit TTF into {target_height}px target height")
+
+    for size in (16, 21, 12, 10, 8):
+        try:
+            font = ImageFont.truetype(str(ttf_path), size=size)
+            canvas = Image.new("L", (100, 100), 0)
+            draw = ImageDraw.Draw(canvas)
+            draw.text((0, 0), "한", font=font, fill=255)
+            bbox = canvas.getbbox()
+            if bbox is not None and (bbox[3] - bbox[1]) <= target_height:
+                return font
+        except (OSError, ValueError):
+            continue
+
+    # Fallback to returning the specified TTF at its default size
+    for default_size in (12, 16, 21):
+        try:
+            return ImageFont.truetype(str(ttf_path), size=default_size)
+        except (OSError, ValueError):
+            continue
+    raise ValueError(f"could not load TTF {ttf_path}")
 
 
 def rewrite_font(
@@ -315,6 +343,38 @@ def write_translation_table(base_table_path: Path, output_path: Path, chars: lis
         f.write("\n")
 
 
+def select_ttf_for_font(ttf_dir: Path, filename: str, target_height: int) -> Path:
+    fn_upper = filename.upper()
+    if target_height <= 9:
+        candidate = ttf_dir / "Galmuri9Bitmap-Regular-2.40.4.ttf"
+        if candidate.is_file():
+            return candidate
+    elif target_height in (10, 11, 12, 13):
+        if "COMP" in fn_upper or "NARROW" in fn_upper:
+            candidate = ttf_dir / "Galmuri11Bitmap-Condensed-2.40.4.ttf"
+            if candidate.is_file():
+                return candidate
+        candidate = ttf_dir / "Galmuri11Bitmap-Regular-2.40.4.ttf"
+        if candidate.is_file():
+            return candidate
+    elif target_height >= 14:
+        candidate = ttf_dir / "Galmuri14Bitmap-Regular-2.40.4.ttf"
+        if candidate.is_file():
+            return candidate
+
+    # Default fallback
+    for fallback_name in (
+        "Galmuri11Bitmap-Regular-2.40.4.ttf",
+        "Galmuri11Bitmap-Condensed-2.40.4.ttf",
+        "Galmuri14Bitmap-Regular-2.40.4.ttf",
+        "Galmuri9Bitmap-Regular-2.40.4.ttf",
+    ):
+        cand = ttf_dir / fallback_name
+        if cand.is_file():
+            return cand
+    raise FileNotFoundError(f"No suitable Galmuri TTF found in {ttf_dir}")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -341,7 +401,13 @@ def parse_args() -> argparse.Namespace:
         default=Path("assets/externalized/translation_tables/translation-table-kor.json"),
         help="output Korean translation table",
     )
-    parser.add_argument("--ttf", type=Path, required=True, help="local Korean-capable TTF font")
+    parser.add_argument("--ttf", type=Path, default=None, help="local Korean-capable TTF font")
+    parser.add_argument(
+        "--ttf-dir",
+        type=Path,
+        default=None,
+        help="directory containing Galmuri TTF fonts (Galmuri9, Galmuri11, Galmuri14)",
+    )
     parser.add_argument(
         "--scale",
         type=float,
@@ -364,8 +430,12 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    if not args.ttf.is_file():
+    if not args.ttf and not args.ttf_dir:
+        raise SystemExit("Must specify either --ttf or --ttf-dir")
+    if args.ttf and not args.ttf.is_file():
         raise SystemExit(f"TTF not found: {args.ttf}")
+    if args.ttf_dir and not args.ttf_dir.is_dir():
+        raise SystemExit(f"TTF directory not found: {args.ttf_dir}")
     if args.scale <= 0:
         raise SystemExit("--scale must be greater than zero")
 
@@ -377,18 +447,29 @@ def main() -> int:
         template = args.template_dir / filename
         if not template.is_file():
             raise SystemExit(f"template STI not found: {template}")
+
+        # Determine target height first to select appropriate TTF if using --ttf-dir
+        sti_temp = StiFile.read(template)
+        first_sub = sti_temp.subimages[0]
+        target_height = max(1, first_sub.height + max(first_sub.offset_y, 0))
+
+        if args.ttf_dir:
+            ttf_path = select_ttf_for_font(args.ttf_dir, filename, target_height)
+        else:
+            ttf_path = args.ttf
+
         output = args.output_dir / filename
         height = rewrite_font(
             template,
             output,
-            args.ttf,
+            ttf_path,
             chars,
             args.scale,
             add_shadow=not args.no_shadow,
         )
         print(
-            f"{filename}: generated {BASE_GLYPH_COUNT + len(chars)} glyphs "
-            f"(height {height}px)"
+            f"{filename:28s}: generated {BASE_GLYPH_COUNT + len(chars)} glyphs "
+            f"(height {height}px using {ttf_path.name})"
         )
 
     write_translation_table(args.base_table, args.output_table, chars)
