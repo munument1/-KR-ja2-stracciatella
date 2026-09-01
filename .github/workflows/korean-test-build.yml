@@ -1,0 +1,119 @@
+name: Korean Windows test build
+
+on:
+  push:
+    branches:
+      - korean-localization
+    paths:
+      - '.github/workflows/korean-test-build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  windows-test-build:
+    name: Windows mingw64 Korean test build
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: false
+          dotnet: true
+          haskell: true
+          large-packages: false
+          docker-images: true
+          swap-storage: true
+
+      - name: Checkout Korean branch
+        uses: actions/checkout@v4
+        with:
+          ref: korean-localization
+          fetch-depth: 1
+
+      - name: Compiler cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/sccache
+          key: korean-linux-mingw64-sccache-v1-${{ github.sha }}
+          restore-keys: |
+            korean-linux-mingw64-sccache-v1-
+            linux-mingw64-sccache-v1-
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.rustup
+          key: korean-linux-mingw64-rust-v2-${{ hashFiles('rust') }}
+          restore-keys: |
+            korean-linux-mingw64-rust-v2-
+            linux-mingw64-rust-v2-
+
+      - name: Set up mingw64 environment
+        shell: bash
+        run: |
+          . "$GITHUB_WORKSPACE/.ci/ci-setup.sh" 2>&1
+          echo "PATH=$PATH" >> "$GITHUB_ENV"
+        env:
+          CI_TARGET: linux-mingw64
+          TARGET_GCC_MAJOR_VERSION: 10
+
+      - name: Build and run tests
+        shell: bash
+        run: "$GITHUB_WORKSPACE/.ci/ci-build.sh" 2>&1
+        env:
+          CI_NAME: Korean Windows Test
+          CI_OS: ubuntu-24.04
+          CI_TARGET: linux-mingw64
+          CI_REF: ${{ github.ref }}
+          GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate Korean EDT layouts
+        shell: bash
+        run: python tools/korean/validate_edt_layout.py
+
+      - name: Assemble test bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-bundle/build-packages
+          found=0
+          for file in ci-build/ja2-stracciatella_*; do
+            if [ -e "$file" ]; then
+              cp "$file" test-bundle/build-packages/
+              found=1
+            fi
+          done
+          if [ "$found" -ne 1 ]; then
+            echo 'No Windows build package found in ci-build/' >&2
+            exit 1
+          fi
+          cp -a assets/mods/korean-localization test-bundle/korean-localization-mod
+          cat > test-bundle/TEST_BUILD_INFO.txt <<EOF
+          JA2-Stracciatella Korean localization test build
+          Commit: $GITHUB_SHA
+
+          Focus checks:
+          - IMP voices/profiles 051-056: Korean tactical dialogue
+          - Recruited RPC profiles 057-061 and 064
+          - Ira after recruitment: MercEdt/059.EDT
+          - Biff/Larry: MercEdt/040.EDT and 046.EDT safely padded only across empty vanilla records
+
+          MercEdt coverage: 70 Korean runtime files
+          MercEdt/200.EDT is intentionally not localized because profile 200 is NO_PROFILE.
+          EOF
+
+      - name: Upload Windows Korean test build
+        uses: actions/upload-artifact@v4
+        with:
+          name: JA2-Stracciatella-Korean-Windows-Test-${{ github.sha }}
+          path: test-bundle
+          if-no-files-found: error
+          retention-days: 14
