@@ -24,24 +24,50 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/munument1/Jagged-Alliance2-korean.git "$RUNNER_TEMP/legacy-ja2-korean"
 
-      - name: Import only vanilla-compatible MercEdt files
+      - name: Import vanilla-compatible MercEdt files
         run: |
           python tools/korean/import_legacy_edt.py \
-            --legacy-root "$RUNNER_TEMP/legacy-ja2-korean"
+            --legacy-root "$RUNNER_TEMP/legacy-ja2-korean" \
+            --trim-extra-records
 
-      - name: Verify imported EDT record alignment
+      - name: Verify imported EDT record alignment and runtime coverage
         run: |
           python - <<'PY'
           from pathlib import Path
 
           root = Path('assets/mods/korean-localization/data/MercEdt')
           files = sorted(root.glob('*.EDT'))
+          names = {p.name for p in files}
           bad = [(p.name, p.stat().st_size) for p in files if p.stat().st_size % 480]
           if bad:
               raise SystemExit(f'EDT files not aligned to 480-byte records: {bad}')
-          if len(files) != 54:
-              raise SystemExit(f'Expected 54 vanilla-compatible Korean MercEdt files including 000.EDT, found {len(files)}')
-          print(f'Validated {len(files)} MercEdt files; every file is 480-byte record aligned.')
+
+          expected_count = 68
+          if len(files) != expected_count:
+              raise SystemExit(f'Expected {expected_count} safe Korean MercEdt files, found {len(files)}')
+
+          required = {f'{profile:03d}.EDT' for profile in range(51, 62)} | {'064.EDT'}
+          missing = sorted(required - names)
+          if missing:
+              raise SystemExit(f'Missing required IMP/RPC Korean MercEdt files: {missing}')
+
+          expected_sizes = {
+              **{f'{profile:03d}.EDT': 55200 for profile in range(51, 57)},
+              **{f'{profile:03d}.EDT': 38400 for profile in range(57, 62)},
+              '064.EDT': 38400,
+          }
+          wrong_sizes = [
+              (name, (root / name).stat().st_size, size)
+              for name, size in expected_sizes.items()
+              if (root / name).stat().st_size != size
+          ]
+          if wrong_sizes:
+              raise SystemExit(f'IMP/RPC EDT sizes differ from Stracciatella reference: {wrong_sizes}')
+
+          print(
+              f'Validated {len(files)} MercEdt files; IMP 051-056 and RPC 057-061/064 '
+              'are present with Stracciatella reference sizes.'
+          )
           PY
 
       - name: Commit imported runtime dialogue
@@ -53,5 +79,5 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'feat(korean): import vanilla-compatible MercEdt translations'
+          git commit -m 'feat(korean): expand Stracciatella MercEdt translations'
           git push origin HEAD:korean-localization
