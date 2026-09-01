@@ -1,0 +1,46 @@
+name: Apply Korean UI translation batch
+
+on:
+  push:
+    branches:
+      - korean-localization
+    paths:
+      - 'tools/korean/apply_ui_translation_batch_*.py'
+      - '.github/workflows/korean-apply-ui-batch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Korean localization branch
+        uses: actions/checkout@v4
+        with:
+          ref: korean-localization
+          fetch-depth: 1
+
+      - name: Apply UI translation batches
+        run: |
+          for batch in tools/korean/apply_ui_translation_batch_*.py; do
+            echo "Applying $batch"
+            python "$batch"
+          done
+
+      - name: Validate localization structure and placeholders
+        run: |
+          python tools/korean/validate_localization_strings.py
+          python tools/korean/audit_translation_coverage.py --json-out korean-translation-coverage.json
+
+      - name: Commit translated UI strings
+        run: |
+          git add assets/externalized/strings/translation-kor.json
+          if git diff --cached --quiet; then
+            echo 'No UI translation changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat(korean): translate first Stracciatella UI batch'
+          git push origin HEAD:korean-localization
