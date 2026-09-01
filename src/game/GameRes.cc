@@ -228,8 +228,8 @@ char const* GetMLGFilename(MultiLanguageGraphic const id)
 			case MLG_TOALUMNI:            return STI("italian", "toalumni");
 			case MLG_TOMUGSHOTS:          return STI("italian", "tomugshots");
 			case MLG_TOSTATS:             return STI("italian", "tostats");
-			case MLG_WARNING:             return STI("italian", "warning");
-			case MLG_YOURAD13:            return STI("italian", "yourad_13");
+			case MLG_WARNING:            return STI("italian", "warning");
+			case MLG_YOURAD13:           return STI("italian", "yourad_13");
 			default:
 				break;
 		}
@@ -269,8 +269,8 @@ char const* GetMLGFilename(MultiLanguageGraphic const id)
 			case MLG_TOALUMNI:            return STI("polish",  "toalumni");
 			case MLG_TOMUGSHOTS:          return STI("polish",  "tomugshots");
 			case MLG_TOSTATS:             return STI("polish",  "tostats");
-			case MLG_WARNING:             return STI("polish",  "warning");
-			case MLG_YOURAD13:            return STI("polish",  "yourad_13");
+			case MLG_WARNING:            return STI("polish",  "warning");
+			case MLG_YOURAD13:           return STI("polish",  "yourad_13");
 			default:
 				break;
 		}
@@ -310,8 +310,8 @@ char const* GetMLGFilename(MultiLanguageGraphic const id)
 			case MLG_TOALUMNI:            return STI("russian", "toalumni");
 			case MLG_TOMUGSHOTS:          return STI("russian", "tomugshots");
 			case MLG_TOSTATS:             return STI("russian", "tostats");
-			case MLG_WARNING:             return STI("russian", "warning");
-			case MLG_YOURAD13:            return STI("russian", "yourad_13");
+			case MLG_WARNING:            return STI("russian", "warning");
+			case MLG_YOURAD13:           return STI("russian", "yourad_13");
 			default:
 				break;
 		}
@@ -329,6 +329,12 @@ SGPVObject* AddVideoObjectFromFile(MultiLanguageGraphic const mlg)
 
 STRING_ENC_TYPE getStringEncType()
 {
+	// Korean EDT assets from the legacy localization use the normal UTF-16LE ROT-1 path,
+	// even though the Korean resource version otherwise reuses English vanilla resources.
+	if (s_gameVersion == GameVersion::KOREAN)
+	{
+		return SE_NORMAL;
+	}
 	if(isRussianVersion() || isRussianGoldVersion())
 	{
 		return SE_RUSSIAN;
