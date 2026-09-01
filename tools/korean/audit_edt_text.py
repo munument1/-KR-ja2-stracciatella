@@ -2,15 +2,16 @@
 """Audit decoded Korean EDT text for high-confidence foreign/garbled characters.
 
 The structural EDT validator proves that a file can be read safely, but structurally
-valid UTF-16 can still contain text imported with the wrong encoding.  This tool
+valid UTF-16 can still contain text imported with the wrong encoding. This tool
 mirrors Stracciatella's ROT-1 decode and reports suspicious script ranges that should
 not normally appear in a Korean localization (CJK ideographs, Japanese kana,
 Bopomofo, Cyrillic, private-use characters, and unexpected control codes).
 
 It is intentionally conservative: Hangul, ASCII, Latin/Latin-extended text, normal
-Unicode punctuation/symbols, and whitespace are accepted.  Each finding includes the
-EDT file, row/column, code point, and a decoded text preview so the original legacy
-record can be checked before changing game text.
+Unicode punctuation/symbols, and whitespace are accepted. Each finding includes the
+EDT file, row/column, code point, decoded Korean text, and the same decoded field from
+the bundled Simplified Chinese vanilla-layout reference when available. The reference
+is diagnostic only; it helps identify the intended meaning before changing game text.
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ import unicodedata
 from validate_edt_layout import (
     BYTES_PER_CHAR,
     EXPECTED_COUNTS,
+    REFERENCE_DIRS,
     decrypt_rot1,
     edt_files,
     layout_for,
@@ -96,6 +98,36 @@ def preview(text: str, limit: int = 120) -> str:
     if len(escaped) > limit:
         return escaped[: limit - 1] + "…"
     return escaped
+
+
+def decode_reference_field(
+    *,
+    reference_root: Path,
+    finding: Finding,
+) -> str | None:
+    columns = layout_for(finding.group, finding.path.name)
+    if columns is None or finding.column >= len(columns):
+        return None
+
+    ref_dir = REFERENCE_DIRS[finding.group]
+    ref_path = reference_root / ref_dir / finding.path.name
+    if not ref_path.is_file():
+        # Preserve the validator's case-insensitive reference behavior.
+        candidates = {p.name.casefold(): p for p in edt_files(reference_root / ref_dir)}
+        ref_path = candidates.get(finding.path.name.casefold())
+        if ref_path is None:
+            return None
+
+    data = ref_path.read_bytes()
+    stride = row_bytes(columns)
+    if not data or len(data) % stride:
+        return None
+    if finding.row >= len(data) // stride:
+        return None
+
+    offset = finding.row * stride
+    offset += sum(columns[: finding.column]) * BYTES_PER_CHAR
+    return decode_field(data, offset, columns[finding.column])
 
 
 def scan_group(group: str, data_root: Path) -> tuple[int, int, list[Finding]]:
@@ -169,6 +201,9 @@ def main() -> int:
 
     repo_root = args.repo_root.resolve()
     data_root = repo_root / "assets" / "mods" / "korean-localization" / "data"
+    reference_root = (
+        repo_root / "assets" / "mods" / "simplified-chinese-localization" / "data"
+    )
     groups = args.group or list(EXPECTED_COUNTS)
 
     total_fields = 0
@@ -176,6 +211,7 @@ def main() -> int:
     findings: list[Finding] = []
 
     print(f"Korean EDT root: {data_root}")
+    print(f"Reference root : {reference_root}")
     print(f"Groups         : {', '.join(groups)}")
     print()
 
@@ -191,6 +227,7 @@ def main() -> int:
 
     if findings:
         print("\nSuspicious decoded text")
+        shown_reference_records: set[tuple[str, str, int, int]] = set()
         for finding in findings[: max(0, args.max_details)]:
             try:
                 rel = finding.path.relative_to(repo_root)
@@ -202,6 +239,17 @@ def main() -> int:
                 f"U+{ord(finding.char):04X} {finding.kind} ({name}): "
                 f"{preview(finding.text)}"
             )
+
+            key = (finding.group, finding.path.as_posix(), finding.row, finding.column)
+            if key not in shown_reference_records:
+                shown_reference_records.add(key)
+                reference_text = decode_reference_field(
+                    reference_root=reference_root,
+                    finding=finding,
+                )
+                if reference_text is not None:
+                    print(f"    reference: {preview(reference_text)}")
+
         if len(findings) > args.max_details:
             print(f"  ... {len(findings) - args.max_details} additional findings omitted")
 
