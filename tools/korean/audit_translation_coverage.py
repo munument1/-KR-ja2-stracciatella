@@ -109,6 +109,7 @@ def compare_family(eng_path: Path, kor_path: Path) -> dict[str, Any]:
     type_mismatches: list[str] = []
     placeholder_mismatches: list[str] = []
     untranslated: list[str] = []
+    untranslated_entries: list[dict[str, str]] = []
     translated = 0
     translatable = 0
 
@@ -127,6 +128,7 @@ def compare_family(eng_path: Path, kor_path: Path) -> dict[str, Any]:
             placeholder_mismatches.append(path)
         if e == k:
             untranslated.append(path)
+            untranslated_entries.append({"path": path, "value": e})
         else:
             translated += 1
 
@@ -138,6 +140,7 @@ def compare_family(eng_path: Path, kor_path: Path) -> dict[str, Any]:
         "translated": translated,
         "untranslated": len(untranslated),
         "untranslated_paths": untranslated,
+        "untranslated_entries": untranslated_entries,
         "missing_paths": missing_paths,
         "extra_paths": extra_paths,
         "type_mismatches": type_mismatches,
@@ -160,6 +163,13 @@ def main() -> int:
         help="Korean localization mod data directory",
     )
     parser.add_argument("--json-out", type=Path)
+    parser.add_argument(
+        "--list-untranslated",
+        action="append",
+        default=[],
+        metavar="FAMILY",
+        help="print English-identical path/value pairs for a family (repeatable; use 'all' for every family)",
+    )
     args = parser.parse_args()
 
     families: list[dict[str, Any]] = []
@@ -226,6 +236,18 @@ def main() -> int:
             f"placeholder mismatches={len(item['placeholder_mismatches'])}, "
             f"structural mismatches={len(item['missing_paths']) + len(item['extra_paths']) + len(item['type_mismatches'])}"
         )
+
+    requested = set(args.list_untranslated)
+    if requested:
+        print()
+        print("English-identical entries")
+        print("=========================")
+        for item in families:
+            if "all" not in requested and item["family"] not in requested:
+                continue
+            print(f"[{item['family']}] {item['untranslated']} entries")
+            for entry in item["untranslated_entries"]:
+                print(f"{entry['path']} = {json.dumps(entry['value'], ensure_ascii=False)}")
 
     if args.json_out:
         args.json_out.parent.mkdir(parents=True, exist_ok=True)
