@@ -20,7 +20,9 @@ import sys
 
 BYTES_PER_CHAR = 2
 EXPECTED_COUNTS = {
-    "MercEdt": 68,
+    # 70 translated/safely reconstructed runtime files. 200.EDT is the
+    # NO_PROFILE sentinel and intentionally remains a base-game fallback.
+    "MercEdt": 70,
     "NPCData": 161,
     "BinaryData": 15,
 }
