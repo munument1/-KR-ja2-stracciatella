@@ -16,10 +16,11 @@ void setGameVersion(GameVersion ver)
 }
 
 
-/** Check if this is English version of the game. */
+/** Check if this version uses English vanilla resource behavior. */
 bool isEnglishVersion()
 {
-	return s_gameVersion == GameVersion::ENGLISH;
+	// Korean localization is layered on top of the English vanilla resources.
+	return s_gameVersion == GameVersion::ENGLISH || s_gameVersion == GameVersion::KOREAN;
 }
 
 
@@ -69,7 +70,7 @@ FLOAT getMajorMapVersion()
 
 char const* GetMLGFilename(MultiLanguageGraphic const id)
 {
-	if((s_gameVersion == GameVersion::ENGLISH) || (s_gameVersion == GameVersion::FRENCH) || (s_gameVersion == GameVersion::RUSSIAN_GOLD) || (s_gameVersion == GameVersion::SIMPLIFIED_CHINESE))
+	if((s_gameVersion == GameVersion::ENGLISH) || (s_gameVersion == GameVersion::FRENCH) || (s_gameVersion == GameVersion::RUSSIAN_GOLD) || (s_gameVersion == GameVersion::SIMPLIFIED_CHINESE) || (s_gameVersion == GameVersion::KOREAN))
 	{
 		switch (id)
 		{
@@ -167,27 +168,27 @@ char const* GetMLGFilename(MultiLanguageGraphic const id)
 			case MLG_HISTORY:            return STI("dutch",   "history");
 			case MLG_IMPSYMBOL:          return STI("dutch",   "impsymbol");
 			case MLG_INSURANCEAD10:      return STI("dutch",   "insurancead_10");
-			case MLG_INSURANCELINK:      return STI("dutch",   "insurancelink");
-			case MLG_INSURANCETITLE:     return STI("dutch",   "largetitle");
-			case MLG_LARGEFLORISTSYMBOL: return STI("dutch",   "largesymbol");
-			case MLG_LOADSAVEHEADER:     return STI("dutch",   "loadscreenaddons");
-			case MLG_MCGILLICUTTYS:      return STI("dutch",   "mcgillicuttys");
-			case MLG_MORTUARY:           return STI("dutch",   "mortuary");
-			case MLG_MORTUARYLINK:       return STI("dutch",   "mortuarylink");
-			case MLG_OPTIONHEADER:       return STI("dutch",   "optionscreenaddons");
-			case MLG_ORDERGRID:          return STI("dutch",   "ordergrid");
-			case MLG_PREBATTLEPANEL:     return STI("dutch",   "prebattlepanel");
-			case MLG_SMALLFLORISTSYMBOL: return STI("dutch",   "smallsymbol");
-			case MLG_SMALLTITLE:         return STI("dutch",   "smalltitle");
-			case MLG_SPLASH:             return STI("dutch",   "splash");
-			case MLG_STATSBOX:           return STI("dutch",   "statsbox");
-			case MLG_STOREPLAQUE:        return STI("dutch",   "storeplaque");
-			case MLG_TITLETEXT:          return STI("dutch",   "titletext");
-			case MLG_TOALUMNI:           return STI("dutch",   "toalumni");
-			case MLG_TOMUGSHOTS:         return STI("dutch",   "tomugshots");
-			case MLG_TOSTATS:            return STI("dutch",   "tostats");
-			case MLG_WARNING:            return STI("dutch",   "warning");
-			case MLG_YOURAD13:           return STI("dutch",   "yourad_13");
+			case MLG_INSURANCELINK:       return STI("dutch",   "insurancelink");
+			case MLG_INSURANCETITLE:      return STI("dutch",   "largetitle");
+			case MLG_LARGEFLORISTSYMBOL:  return STI("dutch",   "largesymbol");
+			case MLG_LOADSAVEHEADER:      return STI("dutch",   "loadscreenaddons");
+			case MLG_MCGILLICUTTYS:       return STI("dutch",   "mcgillicuttys");
+			case MLG_MORTUARY:            return STI("dutch",   "mortuary");
+			case MLG_MORTUARYLINK:        return STI("dutch",   "mortuarylink");
+			case MLG_OPTIONHEADER:        return STI("dutch",   "optionscreenaddons");
+			case MLG_ORDERGRID:           return STI("dutch",   "ordergrid");
+			case MLG_PREBATTLEPANEL:      return STI("dutch",   "prebattlepanel");
+			case MLG_SMALLFLORISTSYMBOL:  return STI("dutch",   "smallsymbol");
+			case MLG_SMALLTITLE:          return STI("dutch",   "smalltitle");
+			case MLG_SPLASH:              return STI("dutch",   "splash");
+			case MLG_STATSBOX:            return STI("dutch",   "statsbox");
+			case MLG_STOREPLAQUE:         return STI("dutch",   "storeplaque");
+			case MLG_TITLETEXT:           return STI("dutch",   "titletext");
+			case MLG_TOALUMNI:            return STI("dutch",   "toalumni");
+			case MLG_TOMUGSHOTS:          return STI("dutch",   "tomugshots");
+			case MLG_TOSTATS:             return STI("dutch",   "tostats");
+			case MLG_WARNING:             return STI("dutch",   "warning");
+			case MLG_YOURAD13:            return STI("dutch",   "yourad_13");
 			default:
 				break;
 		}
@@ -208,27 +209,27 @@ char const* GetMLGFilename(MultiLanguageGraphic const id)
 			case MLG_HISTORY:            return STI("italian", "history");
 			case MLG_IMPSYMBOL:          return STI("italian", "impsymbol");
 			case MLG_INSURANCEAD10:      return STI("italian", "insurancead_10");
-			case MLG_INSURANCELINK:      return STI("italian", "insurancelink");
-			case MLG_INSURANCETITLE:     return STI("italian", "largetitle");
-			case MLG_LARGEFLORISTSYMBOL: return STI("italian", "largesymbol");
-			case MLG_LOADSAVEHEADER:     return STI("italian", "loadscreenaddons");
-			case MLG_MCGILLICUTTYS:      return STI("italian", "mcgillicuttys");
-			case MLG_MORTUARY:           return STI("italian", "mortuary");
-			case MLG_MORTUARYLINK:       return STI("italian", "mortuarylink");
-			case MLG_OPTIONHEADER:       return STI("italian", "optionscreenaddons");
-			case MLG_ORDERGRID:          return STI("italian", "ordergrid");
-			case MLG_PREBATTLEPANEL:     return STI("italian", "prebattlepanel");
-			case MLG_SMALLFLORISTSYMBOL: return STI("italian", "smallsymbol");
-			case MLG_SMALLTITLE:         return STI("italian", "smalltitle");
-			case MLG_SPLASH:             return STI("italian", "splash");
-			case MLG_STATSBOX:           return STI("italian", "statsbox");
-			case MLG_STOREPLAQUE:        return STI("italian", "storeplaque");
-			case MLG_TITLETEXT:          return STI("italian", "titletext");
-			case MLG_TOALUMNI:           return STI("italian", "toalumni");
-			case MLG_TOMUGSHOTS:         return STI("italian", "tomugshots");
-			case MLG_TOSTATS:            return STI("italian", "tostats");
-			case MLG_WARNING:            return STI("italian", "warning");
-			case MLG_YOURAD13:           return STI("italian", "yourad_13");
+			case MLG_INSURANCELINK:       return STI("italian", "insurancelink");
+			case MLG_INSURANCETITLE:      return STI("italian", "largetitle");
+			case MLG_LARGEFLORISTSYMBOL:  return STI("italian", "largesymbol");
+			case MLG_LOADSAVEHEADER:      return STI("italian", "loadscreenaddons");
+			case MLG_MCGILLICUTTYS:       return STI("italian", "mcgillicuttys");
+			case MLG_MORTUARY:            return STI("italian", "mortuary");
+			case MLG_MORTUARYLINK:        return STI("italian", "mortuarylink");
+			case MLG_OPTIONHEADER:        return STI("italian", "optionscreenaddons");
+			case MLG_ORDERGRID:           return STI("italian", "ordergrid");
+			case MLG_PREBATTLEPANEL:      return STI("italian", "prebattlepanel");
+			case MLG_SMALLFLORISTSYMBOL:  return STI("italian", "smallsymbol");
+			case MLG_SMALLTITLE:          return STI("italian", "smalltitle");
+			case MLG_SPLASH:              return STI("italian", "splash");
+			case MLG_STATSBOX:            return STI("italian", "statsbox");
+			case MLG_STOREPLAQUE:         return STI("italian", "storeplaque");
+			case MLG_TITLETEXT:           return STI("italian", "titletext");
+			case MLG_TOALUMNI:            return STI("italian", "toalumni");
+			case MLG_TOMUGSHOTS:          return STI("italian", "tomugshots");
+			case MLG_TOSTATS:             return STI("italian", "tostats");
+			case MLG_WARNING:             return STI("italian", "warning");
+			case MLG_YOURAD13:            return STI("italian", "yourad_13");
 			default:
 				break;
 		}
@@ -249,27 +250,27 @@ char const* GetMLGFilename(MultiLanguageGraphic const id)
 			case MLG_HISTORY:            return STI("polish",  "history");
 			case MLG_IMPSYMBOL:          return STI("polish",  "impsymbol");
 			case MLG_INSURANCEAD10:      return STI("polish",  "insurancead_10");
-			case MLG_INSURANCELINK:      return STI("polish",  "insurancelink");
-			case MLG_INSURANCETITLE:     return STI("polish",  "largetitle");
-			case MLG_LARGEFLORISTSYMBOL: return STI("polish",  "largesymbol");
-			case MLG_LOADSAVEHEADER:     return STI("polish",  "loadscreenaddons");
-			case MLG_MCGILLICUTTYS:      return STI("polish",  "mcgillicuttys");
-			case MLG_MORTUARY:           return STI("polish",  "mortuary");
-			case MLG_MORTUARYLINK:       return STI("polish",  "mortuarylink");
-			case MLG_OPTIONHEADER:       return STI("polish",  "optionscreenaddons");
-			case MLG_ORDERGRID:          return STI("polish",  "ordergrid");
-			case MLG_PREBATTLEPANEL:     return STI("polish",  "prebattlepanel");
-			case MLG_SMALLFLORISTSYMBOL: return STI("polish",  "smallsymbol");
-			case MLG_SMALLTITLE:         return STI("polish",  "smalltitle");
-			case MLG_SPLASH:             return STI("polish",  "splash");
-			case MLG_STATSBOX:           return STI("polish",  "statsbox");
-			case MLG_STOREPLAQUE:        return STI("polish",  "storeplaque");
-			case MLG_TITLETEXT:          return STI("polish",  "titletext");
-			case MLG_TOALUMNI:           return STI("polish",  "toalumni");
-			case MLG_TOMUGSHOTS:         return STI("polish",  "tomugshots");
-			case MLG_TOSTATS:            return STI("polish",  "tostats");
-			case MLG_WARNING:            return STI("polish",  "warning");
-			case MLG_YOURAD13:           return STI("polish",  "yourad_13");
+			case MLG_INSURANCELINK:       return STI("polish",  "insurancelink");
+			case MLG_INSURANCETITLE:      return STI("polish",  "largetitle");
+			case MLG_LARGEFLORISTSYMBOL:  return STI("polish",  "largesymbol");
+			case MLG_LOADSAVEHEADER:      return STI("polish",  "loadscreenaddons");
+			case MLG_MCGILLICUTTYS:       return STI("polish",  "mcgillicuttys");
+			case MLG_MORTUARY:            return STI("polish",  "mortuary");
+			case MLG_MORTUARYLINK:        return STI("polish",  "mortuarylink");
+			case MLG_OPTIONHEADER:        return STI("polish",  "optionscreenaddons");
+			case MLG_ORDERGRID:           return STI("polish",  "ordergrid");
+			case MLG_PREBATTLEPANEL:      return STI("polish",  "prebattlepanel");
+			case MLG_SMALLFLORISTSYMBOL:  return STI("polish",  "smallsymbol");
+			case MLG_SMALLTITLE:          return STI("polish",  "smalltitle");
+			case MLG_SPLASH:              return STI("polish",  "splash");
+			case MLG_STATSBOX:            return STI("polish",  "statsbox");
+			case MLG_STOREPLAQUE:         return STI("polish",  "storeplaque");
+			case MLG_TITLETEXT:           return STI("polish",  "titletext");
+			case MLG_TOALUMNI:            return STI("polish",  "toalumni");
+			case MLG_TOMUGSHOTS:          return STI("polish",  "tomugshots");
+			case MLG_TOSTATS:             return STI("polish",  "tostats");
+			case MLG_WARNING:             return STI("polish",  "warning");
+			case MLG_YOURAD13:            return STI("polish",  "yourad_13");
 			default:
 				break;
 		}
@@ -290,27 +291,27 @@ char const* GetMLGFilename(MultiLanguageGraphic const id)
 			case MLG_HISTORY:            return STI("russian", "history");
 			case MLG_IMPSYMBOL:          return STI("russian", "impsymbol");
 			case MLG_INSURANCEAD10:      return STI("russian", "insurancead_10");
-			case MLG_INSURANCELINK:      return STI("russian", "insurancelink");
-			case MLG_INSURANCETITLE:     return STI("russian", "largetitle");
-			case MLG_LARGEFLORISTSYMBOL: return STI("russian", "largesymbol");
-			case MLG_LOADSAVEHEADER:     return STI("russian", "loadscreenaddons");
-			case MLG_MCGILLICUTTYS:      return STI("russian", "mcgillicuttys");
-			case MLG_MORTUARY:           return STI("russian", "mortuary");
-			case MLG_MORTUARYLINK:       return STI("russian", "mortuarylink");
-			case MLG_OPTIONHEADER:       return STI("russian", "optionscreenaddons");
-			case MLG_ORDERGRID:          return STI("russian", "ordergrid");
-			case MLG_PREBATTLEPANEL:     return STI("russian", "prebattlepanel");
-			case MLG_SMALLFLORISTSYMBOL: return STI("russian", "smallsymbol");
-			case MLG_SMALLTITLE:         return STI("russian", "smalltitle");
-			case MLG_SPLASH:             return STI("russian", "splash");
-			case MLG_STATSBOX:           return STI("russian", "statsbox");
-			case MLG_STOREPLAQUE:        return STI("russian", "bobbystoreplaque");
-			case MLG_TITLETEXT:          return STI("russian", "titletext");
-			case MLG_TOALUMNI:           return STI("russian", "toalumni");
-			case MLG_TOMUGSHOTS:         return STI("russian", "tomugshots");
-			case MLG_TOSTATS:            return STI("russian", "tostats");
-			case MLG_WARNING:            return STI("russian", "warning");
-			case MLG_YOURAD13:           return STI("russian", "yourad_13");
+			case MLG_INSURANCELINK:       return STI("russian", "insurancelink");
+			case MLG_INSURANCETITLE:      return STI("russian", "largetitle");
+			case MLG_LARGEFLORISTSYMBOL:  return STI("russian", "largesymbol");
+			case MLG_LOADSAVEHEADER:      return STI("russian", "loadscreenaddons");
+			case MLG_MCGILLICUTTYS:       return STI("russian", "mcgillicuttys");
+			case MLG_MORTUARY:            return STI("russian", "mortuary");
+			case MLG_MORTUARYLINK:        return STI("russian", "mortuarylink");
+			case MLG_OPTIONHEADER:        return STI("russian", "optionscreenaddons");
+			case MLG_ORDERGRID:           return STI("russian", "ordergrid");
+			case MLG_PREBATTLEPANEL:      return STI("russian", "prebattlepanel");
+			case MLG_SMALLFLORISTSYMBOL:  return STI("russian", "smallsymbol");
+			case MLG_SMALLTITLE:          return STI("russian", "smalltitle");
+			case MLG_SPLASH:              return STI("russian", "splash");
+			case MLG_STATSBOX:            return STI("russian", "statsbox");
+			case MLG_STOREPLAQUE:         return STI("russian", "bobbystoreplaque");
+			case MLG_TITLETEXT:           return STI("russian", "titletext");
+			case MLG_TOALUMNI:            return STI("russian", "toalumni");
+			case MLG_TOMUGSHOTS:          return STI("russian", "tomugshots");
+			case MLG_TOSTATS:             return STI("russian", "tostats");
+			case MLG_WARNING:             return STI("russian", "warning");
+			case MLG_YOURAD13:            return STI("russian", "yourad_13");
 			default:
 				break;
 		}
