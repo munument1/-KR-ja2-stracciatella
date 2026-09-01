@@ -2160,9 +2160,9 @@
         "Show Tree Tops",
         "Show Wireframes",
         "Show 3D Cursor",
-		"Show Lights under Mercs",
-		"Hide Bullets",
-		"Tracking Mode"
+        "Show Lights under Mercs",
+        "Hide Bullets",
+        "Tracking Mode"
     ],
     "zSaveLoadText": [
         "Save Game",
