@@ -8,6 +8,7 @@ on:
       - tools/korean/build_korean_runtime_assets.py
       - tools/korean/import_korean_email_edt.py
       - tools/korean/generate_korean_sti_fonts.py
+      - tools/korean/validate_edt_layout.py
   workflow_dispatch:
 
 permissions:
