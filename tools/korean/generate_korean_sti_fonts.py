@@ -40,6 +40,19 @@ SHADOW_PIXEL = 1
 FOREGROUND_PIXEL = 2
 RUN_LIMIT = 0x7F
 
+# Unicode punctuation used by Korean strings but absent from the preserved
+# 0..213 base glyph set. Alias these to readable ASCII glyphs so the runtime
+# never falls back to '?'. Dedicated glyphs can replace these aliases later.
+KOREAN_FALLBACK_ALIASES = {
+    "~": "-",
+    "‘": "'",
+    "’": "'",
+    "“": '"',
+    "”": '"',
+    "『": '"',
+    "』": '"',
+}
+
 # Same font set shipped by the Simplified Chinese localization mod.
 FONT_FILES = (
     "BLOCKFONT2.sti",
@@ -336,6 +349,9 @@ def write_translation_table(base_table_path: Path, output_path: Path, chars: lis
         table[ch] = idx
     for offset, ch in enumerate(chars):
         table[ch] = BASE_GLYPH_COUNT + offset
+
+    for ch, fallback in KOREAN_FALLBACK_ALIASES.items():
+        table[ch] = table[fallback]
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8", newline="\n") as f:
