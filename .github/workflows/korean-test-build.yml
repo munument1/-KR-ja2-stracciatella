@@ -14,6 +14,7 @@ on:
       - assets/mods/korean-localization/data/Loadscreens/**
       - tools/korean/validate_localization_strings.py
       - tools/korean/validate_edt_layout.py
+      - tools/korean/audit_runtime_assets.py
       - tools/korean/generate_korean_sti_fonts.py
       - tools/korean/build_korean_runtime_assets.py
       - tools/korean/import_korean_email_edt.py
@@ -38,6 +39,10 @@ jobs:
       - name: Validate Korean font fallback aliases
         shell: bash
         run: python3 tools/korean/apply_korean_font_aliases.py --check
+
+      - name: Validate Korean runtime assets
+        shell: bash
+        run: python3 tools/korean/audit_runtime_assets.py
 
       - name: Verify Korean runtime suffix
         shell: bash
@@ -82,7 +87,9 @@ jobs:
             'Korean externalized strings are enabled via the -kor localization suffix.' \
             'Compact Korean UI fonts, including FONT10ARIAL, are generated from Galmuri9.' \
             'EMAIL.EDT is imported from the legacy Korean patch and trimmed to the 448-record Stracciatella layout.' \
-            'Check New Game settings, Options, main-menu copyright, laptop email, IMP profiles 051-056, and recruited Ira profile 059.' \
+            'The legacy Korean JA2 main-menu logo is included as Loadscreens/ja2logo.sti.' \
+            'Runtime asset audit validates EMAIL.EDT and the Korean JA2 logo before packaging.' \
+            'Check New Game settings, Options, main-menu logo/copyright, laptop email, IMP profiles 051-056, and recruited Ira profile 059.' \
             'MercEdt 040 and 046 were safely extended only across empty vanilla records.' \
             'MercEdt 200 is intentionally omitted because profile 200 is NO_PROFILE.' \
             > test-bundle/TEST_BUILD_INFO.txt
