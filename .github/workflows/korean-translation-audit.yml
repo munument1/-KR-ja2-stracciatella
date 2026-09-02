@@ -8,12 +8,14 @@ on:
       - 'assets/externalized/strings/**'
       - 'assets/mods/korean-localization/**'
       - 'tools/korean/audit_translation_coverage.py'
+      - 'tools/korean/audit_runtime_assets.py'
       - '.github/workflows/korean-translation-audit.yml'
   pull_request:
     paths:
       - 'assets/externalized/strings/**'
       - 'assets/mods/korean-localization/**'
       - 'tools/korean/audit_translation_coverage.py'
+      - 'tools/korean/audit_runtime_assets.py'
       - '.github/workflows/korean-translation-audit.yml'
   workflow_dispatch:
 
@@ -34,6 +36,8 @@ jobs:
           python tools/korean/audit_translation_coverage.py \
             --json-out korean-translation-coverage.json \
             --list-untranslated translation
+      - name: Audit Korean runtime assets
+        run: python tools/korean/audit_runtime_assets.py
       - name: Upload audit report
         if: always()
         uses: actions/upload-artifact@v4
