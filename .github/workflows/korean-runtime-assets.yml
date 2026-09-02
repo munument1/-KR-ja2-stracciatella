@@ -41,7 +41,7 @@ jobs:
       - name: Generate Korean main-menu title text
         run: |
           python3 tools/korean/generate_korean_titletext.py \
-            --ttf "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/Fonts/Galmuri14Bitmap-Regular-2.40.4.ttf"
+            --ttf "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/Fonts/Galmuri11Bitmap-Regular-2.40.4.ttf"
 
       - name: Import vanilla-compatible Korean email data
         run: |
