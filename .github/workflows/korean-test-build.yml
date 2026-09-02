@@ -7,7 +7,10 @@ on:
       - .github/workflows/korean-test-build.yml
       - src/externalized/strings/Localization.cc
       - assets/externalized/strings/*-kor.json
+      - assets/externalized/translation_tables/translation-table-kor.json
       - tools/korean/validate_localization_strings.py
+      - tools/korean/generate_korean_sti_fonts.py
+      - tools/korean/apply_korean_font_aliases.py
 
 permissions:
   contents: read
@@ -24,6 +27,10 @@ jobs:
       - name: Validate Korean localization strings
         shell: bash
         run: python3 tools/korean/validate_localization_strings.py
+
+      - name: Validate Korean font fallback aliases
+        shell: bash
+        run: python3 tools/korean/apply_korean_font_aliases.py --check
 
       - name: Verify Korean runtime suffix
         shell: bash
@@ -66,6 +73,7 @@ jobs:
             "Commit: $GITHUB_SHA" \
             '' \
             'Korean externalized strings are enabled via the -kor localization suffix.' \
+            'Korean punctuation fallbacks cover ~, smart quotes, and corner brackets.' \
             'Check New Game settings, Options, and main-menu copyright text.' \
             'Check IMP profiles 051-056 and recruited Ira profile 059.' \
             'MercEdt 040 and 046 were safely extended only across empty vanilla records.' \
