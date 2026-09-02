@@ -1,0 +1,64 @@
+name: Build Korean Runtime Assets
+
+on:
+  push:
+    branches: [korean-localization]
+    paths:
+      - .github/workflows/korean-runtime-assets.yml
+      - tools/korean/build_korean_runtime_assets.py
+      - tools/korean/import_korean_email_edt.py
+      - tools/korean/generate_korean_sti_fonts.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-assets:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Stracciatella Korean branch
+        uses: actions/checkout@v4
+        with:
+          ref: korean-localization
+          fetch-depth: 0
+
+      - name: Checkout legacy Korean patch
+        run: git clone --depth 1 https://github.com/munument1/Jagged-Alliance2-korean.git "$RUNNER_TEMP/legacy-ja2-korean"
+
+      - name: Install font builder dependency
+        run: python3 -m pip install --user Pillow
+
+      - name: Rebuild Korean STI fonts
+        run: |
+          python3 tools/korean/build_korean_runtime_assets.py \
+            --ttf-dir "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/Fonts"
+
+      - name: Import vanilla-compatible Korean email data
+        run: |
+          python3 tools/korean/import_korean_email_edt.py \
+            --legacy-root "$RUNNER_TEMP/legacy-ja2-korean"
+
+      - name: Validate generated localization assets
+        run: |
+          python3 tools/korean/apply_korean_font_aliases.py --check
+          python3 tools/korean/validate_localization_strings.py
+          python3 tools/korean/validate_edt_layout.py
+          test "$(stat -c %s assets/mods/korean-localization/data/BinaryData/EMAIL.EDT)" -eq 143360
+          git diff --check
+
+      - name: Commit generated runtime assets
+        shell: bash
+        run: |
+          git add \
+            assets/mods/korean-localization/data/Fonts \
+            assets/mods/korean-localization/data/BinaryData/EMAIL.EDT \
+            assets/externalized/translation_tables/translation-table-kor.json
+          if git diff --cached --quiet; then
+            echo 'No generated Korean runtime asset changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(korean): rebuild small fonts and import email text'
+          git push origin HEAD:korean-localization
