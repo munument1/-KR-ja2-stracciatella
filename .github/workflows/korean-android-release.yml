@@ -1,0 +1,179 @@
+name: Korean Android Release APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [korean-localization]
+    paths:
+      - .github/workflows/korean-android-release.yml
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    runs-on: ubuntu-22.04
+    env:
+      RELEASE_TAG: v0.1.0-alpha.1
+      APK_NAME: JA2-Stracciatella-Korean-v0.1.0-alpha.1-Android-debug.apk
+      WINDOWS_NAME: JA2-Stracciatella-Korean-v0.1.0-alpha.1-Windows.zip
+
+    steps:
+      - name: Checkout Korean branch
+        uses: actions/checkout@v4
+        with:
+          ref: korean-localization
+
+      - name: Validate Korean runtime assets
+        run: |
+          set -euo pipefail
+          python3 tools/korean/validate_localization_strings.py
+          python3 tools/korean/apply_korean_font_aliases.py --check
+          python3 tools/korean/ensure_korean_font_symbols.py --check
+          python3 tools/korean/validate_edt_layout.py
+          python3 tools/korean/audit_runtime_assets.py
+          python3 tools/korean/audit_korean_translation_text.py
+          python3 tools/korean/audit_edt_text.py --fail-on-suspicious
+
+      - name: Flatten Korean localization into Android assets
+        run: |
+          set -euo pipefail
+          cp -a assets/mods/korean-localization/data/. assets/
+          rm -rf assets/mods/korean-localization
+          test -f assets/Fonts/FONT10ARIAL.sti
+          test -f assets/BinaryData/AIMBIOS.EDT
+          test -f assets/Loadscreens/titletext.sti
+          test -f assets/externalized/strings/translation-kor.json
+          test -f assets/externalized/translation_tables/translation-table-kor.json
+
+      - name: Set up JDK 18
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 18
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Set up Android build environment
+        shell: bash
+        env:
+          CI_TARGET: android
+          ANDROID_KEYSTORE_FILE: ""
+        run: |
+          set -e
+          . "${GITHUB_WORKSPACE}/.ci/ci-setup.sh" 2>&1
+          echo "PATH=$PATH" >> "$GITHUB_ENV"
+
+      - name: Build Korean Android debug APK
+        shell: bash
+        env:
+          CI_NAME: Korean Android
+          CI_OS: ubuntu-22.04
+          CI_TARGET: android
+          CI_REF: refs/heads/korean-localization
+          ANDROID_KEYSTORE_PASSWORD: ""
+        run: "${GITHUB_WORKSPACE}/.ci/ci-build.sh 2>&1"
+
+      - name: Prepare and verify APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          src_apk="$(find ci-build -maxdepth 1 -type f -name '*_android.apk' -print -quit)"
+          test -n "$src_apk"
+          cp "$src_apk" "$APK_NAME"
+
+          unzip -l "$APK_NAME" | grep -F 'assets/Fonts/FONT10ARIAL.sti'
+          unzip -l "$APK_NAME" | grep -F 'assets/BinaryData/AIMBIOS.EDT'
+          unzip -l "$APK_NAME" | grep -F 'assets/Loadscreens/titletext.sti'
+          unzip -l "$APK_NAME" | grep -F 'assets/externalized/strings/translation-kor.json'
+          unzip -l "$APK_NAME" | grep -F 'assets/externalized/translation_tables/translation-table-kor.json'
+          sha256sum "$APK_NAME"
+
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: JA2-Stracciatella-Korean-Android-debug
+          path: ${{ env.APK_NAME }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Add APK to existing prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" >/dev/null
+          gh release upload "$RELEASE_TAG" "$APK_NAME" --clobber
+
+      - name: Refresh release checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          rm -rf release-checksum
+          mkdir release-checksum
+          gh release download "$RELEASE_TAG" --pattern "$WINDOWS_NAME" --dir release-checksum
+          cp "$APK_NAME" release-checksum/
+          (
+            cd release-checksum
+            sha256sum "$WINDOWS_NAME" "$APK_NAME" > ../SHA256SUMS.txt
+          )
+          gh release upload "$RELEASE_TAG" SHA256SUMS.txt --clobber
+
+      - name: Update release notes for Windows and Android
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat > RELEASE_NOTES.md <<'EOF'
+          ## JA2 Stracciatella 한국어판 첫 알파 릴리즈
+
+          JA2 Stracciatella에 한국어 런타임 지원과 한국어 로컬라이제이션 자산을 적용한 프리뷰 릴리즈입니다.
+
+          ### 확인된 Windows 기능
+          - New Game 화면 한국어 출력
+          - Options 화면 한국어 출력
+          - New Game 설정 후 실제 게임 진입
+          - 게임 내 용병/NPC 대사 한국어 출력
+          - A.I.M. 용병 전기 및 추가 정보 한국어 출력
+          - 아이템/Bobby Ray 설명 한국어 출력
+          - 한국어 폰트 및 메인 메뉴 자산 적용
+
+          ### 파일
+          - `JA2-Stracciatella-Korean-v0.1.0-alpha.1-Windows.zip`
+            - 한국어 지원 Windows 실행 파일과 최신 한국어 자산을 포함한 일반 사용자용 패키지
+          - `JA2-Stracciatella-Korean-v0.1.0-alpha.1-Android-debug.apk`
+            - Android 테스트용 APK
+            - Debug 서명 빌드이므로 현재는 알파 테스트 용도입니다.
+          - `SHA256SUMS.txt`
+            - Windows ZIP과 Android APK 무결성 확인용 SHA-256
+
+          ### Windows 설치
+          1. Windows ZIP을 원하는 위치에 압축 해제합니다.
+          2. `ja2-launcher.exe`에서 본인이 보유한 Jagged Alliance 2 원본 게임 데이터 위치를 지정합니다.
+          3. `Korean Localization`을 활성화합니다.
+          4. 게임을 실행합니다.
+
+          ### Android 설치 및 실행
+          1. APK를 설치합니다. 필요하면 Android 설정에서 해당 브라우저/파일 앱의 '알 수 없는 앱 설치'를 허용합니다.
+          2. 기기에 본인이 보유한 Jagged Alliance 2 원본 게임 데이터를 준비합니다.
+          3. Stracciatella의 Data 탭에서 원본 게임 데이터 폴더를 지정합니다.
+          4. Game Version을 `Korean`으로 선택합니다.
+          5. 게임을 실행합니다.
+
+          ### 주의
+          - 이 릴리즈에는 Jagged Alliance 2 원본 게임 데이터가 포함되어 있지 않습니다.
+          - Windows 패키지는 실제 게임 진입 및 한국어 출력까지 확인되었습니다.
+          - Android APK는 별도 플랫폼 빌드이므로 기기별 실제 실행 검증이 추가로 필요합니다.
+          - 한국어 런타임 지원은 아직 JA2 Stracciatella upstream 공식 빌드에 포함된 상태가 아닙니다.
+
+          ### 기준
+          - Korean Windows runtime: `d23e3db5222b62037616a0e34eb0003ca7036da1`
+          - Korean Localization assets: `82df6b43d54784f717d586143970e20ba0c8498e`
+          EOF
+          gh release edit "$RELEASE_TAG" \
+            --title 'JA2 Stracciatella 한국어판 v0.1.0-alpha.1' \
+            --notes-file RELEASE_NOTES.md \
+            --prerelease
