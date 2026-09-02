@@ -4,8 +4,20 @@ These instructions are authoritative for work on the `korean-localization` branc
 
 ## Goal
 
-Maintain and test the Korean localization without rebuilding unrelated Stracciatella targets.
-Prefer the smallest validation/build path that can prove the current change.
+This project is primarily a Korean localization contribution for upstream JA2 Stracciatella, not a long-term custom executable fork.
+
+The intended final shape is:
+
+- official/upstream JA2 Stracciatella executable with minimal Korean resource-version support,
+- `assets/mods/korean-localization/**` for Korean legacy game data, fonts, EDT and STI assets,
+- Korean externalized strings/tables (`*-kor.json` and `translation-table-kor.json`),
+- no separately maintained Korean-only executable once upstream Korean support is available.
+
+Simplified Chinese is the architectural reference: its localization mod works because upstream already knows the `SIMPLIFIED_CHINESE` resource version and `-chs` suffix. Korean therefore needs only the minimum engine integration required to recognize/select Korean and load Korean resources. Do not turn this project into unrelated engine development.
+
+During localization work, prefer asset/mod changes. Do not edit executable source unless the change is demonstrably required for Korean resource-version integration or Korean text behavior that cannot be expressed through localization assets.
+
+Maintain and test the Korean localization without rebuilding unrelated Stracciatella targets. Prefer the smallest validation/build path that can prove the current change.
 
 ## Known working baseline
 
@@ -46,18 +58,20 @@ For asset-only work:
 
 Important: `mods/korean-localization` alone is sufficient only when the changed files are actually confined to that mod directory. Korean `*-kor.json` strings and `translation-table-kor.json` are packaged under the installed `externalized/` directory, so the lightweight test artifact includes both the mod and the Korean externalized files.
 
-### 2. Engine/build change: build Windows only
+### 2. Engine/build change: exceptional, Windows only
 
-A new executable is required when changing runtime/build source such as:
+Engine edits are exceptional. Before changing `src/**` or `rust/**`, first prove that the desired Korean behavior cannot be achieved with localization/mod assets.
 
-- `src/**`
-- `rust/**`
-- `.ci/**`
-- `cmake/**`
-- `CMakeLists.txt`
-- build/toolchain metadata that can affect the executable
+Legitimate engine changes should be limited to the minimum needed for upstream-style Korean integration, for example:
 
-For those changes, use `Korean Windows Test Build` only. Do not run the upstream Linux/macOS/Android matrix for Korean localization testing.
+- registering/selecting the Korean resource version,
+- mapping Korean to the `-kor` localization suffix,
+- launcher/configuration exposure needed to select Korean,
+- narrowly scoped Korean grammar/runtime handling that cannot be represented safely in translation data.
+
+Do not change engine code merely to fix missing translations, fonts, EDT content, item descriptions, AIM/MERC/IMP text, menu images or other data problems.
+
+When a genuine engine/build change is necessary, use `Korean Windows Test Build` only. Do not run the upstream Linux/macOS/Android matrix for Korean localization testing.
 
 ### 3. Mixed change
 
@@ -67,18 +81,20 @@ If both source and assets change, finish and validate the assets first, then run
 
 - Upstream `GitHub CI` is intentionally skipped for the Korean localization PR/branch because it launches Linux, Linux-mingw64, macOS, Android and lint matrices that are not useful for routine localization work.
 - `Korean Asset Test Package` is the normal test path for translation/font/EDT/STI changes.
-- `Korean Windows Test Build` is reserved for source/build changes or an explicit manual request for a fresh executable baseline.
+- `Korean Windows Test Build` is reserved for proven source/build changes or an explicit manual request for a fresh executable baseline.
 - `Build Korean Runtime Assets` may regenerate and commit runtime assets, but must not automatically trigger a full Windows compile merely because generated assets changed.
 - Never repeatedly rerun the same failed workflow without first identifying and fixing the exact failing step.
 
 ## Korean runtime rules that must not be regressed
 
-- Keep `isKoreanVersion()` and the Korean localization path.
-- Keep the `-kor` externalized-string suffix support in `src/externalized/strings/Localization.cc`.
+- Keep the currently working Korean resource-version path until equivalent support exists upstream.
+- Keep the `-kor` externalized-string suffix support needed for Korean selection.
+- Treat custom executable changes as transitional upstream-integration work, not the localization payload itself.
 - Do not weaken `Font.cc` invalid-character validation to hide missing mappings.
 - Keep U+00B7 (`·`) mapped through the Korean translation table; do not solve it by disabling validation.
 - Do not enlarge the Save/Load font again. `SAVE_LOAD_NORMAL_FONT` should remain `FONT12ARIAL` unless a new, demonstrated regression requires a separate fix.
-- Do not revert `GameRes.cc`/English-version behavior as a shortcut for Korean support.
+- Do not alter English or Simplified Chinese behavior as a shortcut to make Korean work.
+- Do not repurpose the Simplified Chinese resource version for Korean; Korean should have its own upstream-style resource version.
 - Do not copy whole 1.13 EDT files into vanilla Stracciatella without validating record count/layout/size.
 
 ## Translation policy
