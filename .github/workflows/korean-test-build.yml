@@ -6,23 +6,14 @@ on:
     branches: [korean-localization]
     paths:
       - .github/workflows/korean-test-build.yml
-      - src/externalized/strings/Localization.cc
-      - assets/externalized/strings/*-kor.json
-      - assets/externalized/translation_tables/translation-table-kor.json
-      - assets/mods/korean-localization/data/BinaryData/**
-      - assets/mods/korean-localization/data/Fonts/**
-      - assets/mods/korean-localization/data/Loadscreens/**
-      - tools/korean/validate_localization_strings.py
-      - tools/korean/validate_edt_layout.py
-      - tools/korean/audit_runtime_assets.py
-      - tools/korean/audit_korean_translation_text.py
-      - tools/korean/generate_korean_sti_fonts.py
-      - tools/korean/generate_korean_titletext.py
-      - tools/korean/import_korean_legacy_binarydata.py
-      - tools/korean/build_korean_runtime_assets.py
-      - tools/korean/import_korean_email_edt.py
-      - tools/korean/apply_korean_font_aliases.py
-      - tools/korean/ensure_korean_font_symbols.py
+      - src/**
+      - rust/**
+      - .ci/**
+      - cmake/**
+      - CMakeLists.txt
+      - Cargo.toml
+      - Cargo.lock
+      - min-rust-version
 
 permissions:
   contents: read
@@ -75,16 +66,14 @@ jobs:
           cp ci-build/ja2-stracciatella_* test-bundle/build-packages/
           cp -a assets/mods/korean-localization test-bundle/korean-localization-mod
           printf '%s\n' \
-            'JA2-Stracciatella Korean localization test build' \
+            'JA2-Stracciatella Korean localization Windows source test build' \
             "Commit: $GITHUB_SHA" \
             '' \
+            'Use this workflow only when engine/build source changes or when a fresh executable baseline is explicitly required.' \
+            'Asset-only Korean changes should use the Korean Asset Test Package workflow instead.' \
             'Korean externalized strings are enabled via the -kor localization suffix.' \
             'Small Korean UI fonts are generated from Galmuri9; the baked main-menu labels use Galmuri14.' \
             'U+00B7 middle dot has a validated Korean runtime font mapping.' \
-            'AIM and MERC biographies use vanilla-layout Korean AIMBIOS/MERCBIOS data.' \
-            'Vanilla item and Bobby Ray names/descriptions are rebuilt from the Korean 1.13 item translation.' \
-            'IMP and the newly imported BinaryData pass the high-confidence English-fallback audit.' \
-            'EMAIL.EDT is imported from the legacy Korean patch and trimmed to the Stracciatella layout.' \
             'Check main-menu label size, AIM biographies/additional info/equipment, MERC biographies, IMP, Bobby Ray and item descriptions.' \
             > test-bundle/TEST_BUILD_INFO.txt
       - name: Upload artifact

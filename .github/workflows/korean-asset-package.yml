@@ -1,0 +1,75 @@
+name: Korean Asset Test Package
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [korean-localization]
+    paths:
+      - .github/workflows/korean-asset-package.yml
+      - assets/mods/korean-localization/**
+      - assets/externalized/strings/*-kor.json
+      - assets/externalized/translation_tables/translation-table-kor.json
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: korean-localization
+
+      - name: Validate Korean localization strings
+        run: python3 tools/korean/validate_localization_strings.py
+
+      - name: Validate Korean font mappings
+        run: |
+          python3 tools/korean/apply_korean_font_aliases.py --check
+          python3 tools/korean/ensure_korean_font_symbols.py --check
+
+      - name: Validate Korean runtime assets
+        run: |
+          python3 tools/korean/validate_edt_layout.py
+          python3 tools/korean/audit_runtime_assets.py
+          python3 tools/korean/audit_korean_translation_text.py
+          python3 tools/korean/audit_edt_text.py --fail-on-suspicious
+
+      - name: Assemble lightweight Korean overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-patch/mods
+          mkdir -p test-patch/externalized/strings
+          mkdir -p test-patch/externalized/translation_tables
+
+          cp -a assets/mods/korean-localization test-patch/mods/
+          cp assets/externalized/strings/*-kor.json test-patch/externalized/strings/
+          cp assets/externalized/translation_tables/translation-table-kor.json \
+            test-patch/externalized/translation_tables/
+
+          cat > test-patch/TEST_PATCH_INFO.txt <<EOF
+          JA2-Stracciatella Korean asset-only test package
+          Commit: $GITHUB_SHA
+
+          This artifact intentionally contains no executable.
+          Overlay it onto a compatible Korean-enabled JA2-Stracciatella Windows build.
+
+          Included:
+          - mods/korean-localization
+          - externalized/strings/*-kor.json
+          - externalized/translation_tables/translation-table-kor.json
+
+          Asset-only changes do not require rebuilding Stracciatella.
+          Build a fresh Windows executable only when src/, rust/, .ci/, cmake/ or other build/runtime source changes.
+          EOF
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: JA2-Stracciatella-Korean-Assets-Test
+          path: test-patch
+          if-no-files-found: error
+          retention-days: 14
