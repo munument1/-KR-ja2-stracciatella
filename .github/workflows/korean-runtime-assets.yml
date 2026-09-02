@@ -42,26 +42,44 @@ jobs:
           python3 tools/korean/import_korean_email_edt.py \
             --legacy-root "$RUNNER_TEMP/legacy-ja2-korean"
 
-      - name: Import missing Skyrider Korean dialogue
+      - name: Import missing vanilla Korean NPC dialogue
         shell: bash
         run: |
           set -euo pipefail
-          src="$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/NPCData/097.EDT"
-          ref="assets/mods/simplified-chinese-localization/data/npcdata/097.EDT"
-          dst="assets/mods/korean-localization/data/NPCData/097.EDT"
-          test -f "$src"
-          test -f "$ref"
-          src_size="$(stat -c %s "$src")"
-          ref_size="$(stat -c %s "$ref")"
-          test "$src_size" -eq 27840
-          test "$ref_size" -eq 26400
-          test $((src_size % 480)) -eq 0
-          test $((ref_size % 480)) -eq 0
-          test "$src_size" -ge "$ref_size"
-          mkdir -p "$(dirname "$dst")"
-          head -c "$ref_size" "$src" > "$dst"
-          test "$(stat -c %s "$dst")" -eq "$ref_size"
-          echo "Imported SKYRIDER 097.EDT: $((src_size / 480)) legacy records -> $((ref_size / 480)) vanilla records"
+
+          import_npc() {
+            local src="$1"
+            local name="$2"
+            local expected_src_size="$3"
+            local expected_ref_size="$4"
+            local label="$5"
+            local ref="assets/mods/simplified-chinese-localization/data/npcdata/$name"
+            local dst="assets/mods/korean-localization/data/NPCData/$name"
+
+            test -f "$src"
+            test -f "$ref"
+            local src_size="$(stat -c %s "$src")"
+            local ref_size="$(stat -c %s "$ref")"
+            test "$src_size" -eq "$expected_src_size"
+            test "$ref_size" -eq "$expected_ref_size"
+            test $((src_size % 480)) -eq 0
+            test $((ref_size % 480)) -eq 0
+            test "$src_size" -ge "$ref_size"
+            mkdir -p "$(dirname "$dst")"
+            head -c "$ref_size" "$src" > "$dst"
+            test "$(stat -c %s "$dst")" -eq "$ref_size"
+            echo "Imported $label $name: $((src_size / 480)) legacy records -> $((ref_size / 480)) vanilla records"
+          }
+
+          import_npc \
+            "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/NPCData/097.EDT" \
+            097.EDT 27840 26400 SKYRIDER
+          import_npc \
+            "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/NPCData/138.EDT" \
+            138.EDT 13440 10560 WALDO
+          import_npc \
+            "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data-1.13/NpcData/159.EDT" \
+            159.EDT 42240 36480 SPECK
 
       - name: Import Korean main-menu logo
         shell: bash
@@ -91,6 +109,8 @@ jobs:
             assets/mods/korean-localization/data/Fonts \
             assets/mods/korean-localization/data/BinaryData/EMAIL.EDT \
             assets/mods/korean-localization/data/NPCData/097.EDT \
+            assets/mods/korean-localization/data/NPCData/138.EDT \
+            assets/mods/korean-localization/data/NPCData/159.EDT \
             assets/mods/korean-localization/data/Loadscreens/ja2logo.sti \
             assets/externalized/translation_tables/translation-table-kor.json
           if git diff --cached --quiet; then
