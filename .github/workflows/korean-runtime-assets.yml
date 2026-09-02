@@ -21,10 +21,10 @@ permissions:
   actions: write
 
 jobs:
-  build-assets:
+  build_assets:
     runs-on: ubuntu-24.04
     outputs:
-      assets-changed: ${{ steps.commit-assets.outputs.changed }}
+      assets_changed: ${{ steps.commit_assets.outputs.changed }}
     steps:
       - name: Checkout Stracciatella Korean branch
         uses: actions/checkout@v4
@@ -103,7 +103,7 @@ jobs:
           git diff --check
 
       - name: Commit generated runtime assets
-        id: commit-assets
+        id: commit_assets
         shell: bash
         run: |
           git add \
@@ -131,8 +131,70 @@ jobs:
           git push origin HEAD:korean-localization
           echo 'changed=true' >> "$GITHUB_OUTPUT"
 
-  windows-test-build:
+  windows_test_build:
     name: Korean Windows Test Build
-    needs: build-assets
-    if: needs.build-assets.outputs.assets-changed == 'true'
-    uses: ./.github/workflows/korean-test-build.yml
+    needs: build_assets
+    if: needs.build_assets.outputs.assets_changed == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout latest Korean branch
+        uses: actions/checkout@v4
+        with:
+          ref: korean-localization
+
+      - name: Validate Korean localization strings
+        run: python3 tools/korean/validate_localization_strings.py
+      - name: Validate Korean font mappings
+        run: |
+          python3 tools/korean/apply_korean_font_aliases.py --check
+          python3 tools/korean/ensure_korean_font_symbols.py --check
+      - name: Validate Korean runtime assets
+        run: |
+          python3 tools/korean/audit_runtime_assets.py
+          python3 tools/korean/audit_korean_translation_text.py
+          python3 tools/korean/audit_edt_text.py --fail-on-suspicious
+      - name: Verify Korean runtime suffix
+        run: grep -F 'case VanillaVersion::KOREAN:       return "-kor";' src/externalized/strings/Localization.cc
+      - name: Set up mingw64 environment
+        env:
+          CI_TARGET: linux-mingw64
+          TARGET_GCC_MAJOR_VERSION: 10
+        run: |
+          . "$GITHUB_WORKSPACE/.ci/ci-setup.sh" 2>&1
+          echo "PATH=$PATH" >> "$GITHUB_ENV"
+      - name: Build and test
+        env:
+          CI_NAME: Korean-Windows-Test
+          CI_OS: ubuntu-24.04
+          CI_TARGET: linux-mingw64
+          CI_REF: ${{ github.ref }}
+          GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: "$GITHUB_WORKSPACE/.ci/ci-build.sh" 2>&1
+      - name: Validate Korean EDT
+        run: python tools/korean/validate_edt_layout.py
+      - name: Assemble bundle
+        run: |
+          set -e
+          mkdir -p test-bundle/build-packages
+          cp ci-build/ja2-stracciatella_* test-bundle/build-packages/
+          cp -a assets/mods/korean-localization test-bundle/korean-localization-mod
+          printf '%s\n' \
+            'JA2-Stracciatella Korean localization test build' \
+            "Commit: $(git rev-parse HEAD)" \
+            '' \
+            'Korean externalized strings are enabled via the -kor localization suffix.' \
+            'Small Korean UI fonts are generated from Galmuri9; the baked main-menu labels use Galmuri14.' \
+            'U+00B7 middle dot has a validated Korean runtime font mapping.' \
+            'AIM and MERC biographies use vanilla-layout Korean AIMBIOS/MERCBIOS data.' \
+            'Vanilla item and Bobby Ray names/descriptions are rebuilt from the Korean 1.13 item translation.' \
+            'IMP and the newly imported BinaryData pass the high-confidence English-fallback audit.' \
+            'EMAIL.EDT is imported from the legacy Korean patch and trimmed to the Stracciatella layout.' \
+            'Check main-menu label size, AIM biographies/additional info/equipment, MERC biographies, IMP, Bobby Ray and item descriptions.' \
+            > test-bundle/TEST_BUILD_INFO.txt
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: JA2-Stracciatella-Korean-Windows-Test
+          path: test-bundle
+          if-no-files-found: error
+          retention-days: 14
