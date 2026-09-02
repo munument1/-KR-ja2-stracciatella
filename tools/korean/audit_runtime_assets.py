@@ -101,8 +101,8 @@ def validate_titletext(root: Path) -> list[str]:
     sub_count = struct.unpack_from("<H", raw, 28)[0]
     flags = struct.unpack_from("<I", raw, 16)[0]
     errors: list[str] = []
-    if sub_count != 17:
-        errors.append(f"STRUCT Loadscreens/titletext.sti: expected 17 frames, got {sub_count}")
+    if sub_count != 20:
+        errors.append(f"STRUCT Loadscreens/titletext.sti: expected 20 frames, got {sub_count}")
     if not (flags & 0x0008) or not (flags & 0x0020):
         errors.append("STRUCT Loadscreens/titletext.sti: expected indexed ETRLE-compressed STI")
     return errors
@@ -140,7 +140,7 @@ def main() -> int:
 
     title_errors = validate_titletext(args.mod_dir)
     errors.extend(title_errors)
-    print(f"{'FAIL' if title_errors else 'OK':4} Loadscreens/titletext.sti - 17 indexed ETRLE button-state frames")
+    print(f"{'FAIL' if title_errors else 'OK':4} Loadscreens/titletext.sti - 20 indexed ETRLE frames; runtime labels localized in 0..16")
 
     font_errors = validate_fonts(args.mod_dir)
     errors.extend(font_errors)
