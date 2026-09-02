@@ -36,10 +36,13 @@ from validate_edt_layout import (
 # Exact runtime-decoded foreign-language lines intentionally present in vanilla JA2.
 # Quote 73 is QUOTE_ME_TOO in Dialogue_Control.h. Ivan's vanilla EDT stores the
 # Russian "Я ТОЖЕ." through JA2's historical broken Cyrillic encoding; the engine
-# explicitly repairs that encoding in LoadEncryptedData(). Keep this exact guard so
-# any different Cyrillic text still fails the audit.
+# explicitly repairs that encoding in LoadEncryptedData(). EMAIL.EDT row 156 also
+# contains an intentionally garbled A.I.M. forwarded-message payload; bundled
+# vanilla localization references preserve the same Cyrillic-style transmission.
+# Keep exact guards so any different Cyrillic text still fails the audit.
 INTENTIONAL_FOREIGN_TEXT: dict[tuple[str, str, int, int], str] = {
     ("MercEdt", "007.edt", 73, 0): "Я ТОЖЕ.",
+    ("BinaryData", "email.edt", 156, 0): "AIM 서버에서 온 전달 메시지: НАИdАМ ПИЕИЙСИ",
 }
 
 
