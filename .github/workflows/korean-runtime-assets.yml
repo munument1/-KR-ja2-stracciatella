@@ -8,6 +8,7 @@ on:
       - tools/korean/build_korean_runtime_assets.py
       - tools/korean/import_korean_email_edt.py
       - tools/korean/generate_korean_sti_fonts.py
+      - tools/korean/generate_korean_titletext.py
       - tools/korean/validate_edt_layout.py
       - tools/korean/audit_runtime_assets.py
   workflow_dispatch:
@@ -36,6 +37,11 @@ jobs:
         run: |
           python3 tools/korean/build_korean_runtime_assets.py \
             --ttf-dir "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/Fonts"
+
+      - name: Generate Korean main-menu title text
+        run: |
+          python3 tools/korean/generate_korean_titletext.py \
+            --ttf "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/Fonts/Galmuri14Bitmap-Regular-2.40.4.ttf"
 
       - name: Import vanilla-compatible Korean email data
         run: |
@@ -112,6 +118,7 @@ jobs:
             assets/mods/korean-localization/data/NPCData/138.EDT \
             assets/mods/korean-localization/data/NPCData/159.EDT \
             assets/mods/korean-localization/data/Loadscreens/ja2logo.sti \
+            assets/mods/korean-localization/data/Loadscreens/titletext.sti \
             assets/externalized/translation_tables/translation-table-kor.json
           if git diff --cached --quiet; then
             echo 'No generated Korean runtime asset changes to commit.'
