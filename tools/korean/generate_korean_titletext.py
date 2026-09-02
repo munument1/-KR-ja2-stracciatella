@@ -115,12 +115,23 @@ def choose_frame_colors(rows: list[list[int]], palette: bytes) -> tuple[int, int
 
 
 def fit_font(ttf: Path, text: str, max_width: int, max_height: int) -> ImageFont.FreeTypeFont:
+    # Galmuri Bitmap TTFs expose only their native bitmap strike size(s).
+    # Pillow raises OSError("invalid pixel size") for unsupported sizes, so
+    # probe downward and simply skip sizes the font does not provide.
+    supported: list[int] = []
     for size in range(max_height, 5, -1):
-        font = ImageFont.truetype(str(ttf), size=size)
+        try:
+            font = ImageFont.truetype(str(ttf), size=size)
+        except OSError:
+            continue
+        supported.append(size)
         box = font.getbbox(text)
         if box[2] - box[0] <= max_width and box[3] - box[1] <= max_height:
             return font
-    raise ValueError(f"cannot fit {text!r} into {max_width}x{max_height}")
+    raise ValueError(
+        f"cannot fit {text!r} into {max_width}x{max_height}; "
+        f"supported bitmap sizes tried: {supported}"
+    )
 
 
 def render_label(text: str, width: int, height: int, foreground: int,
@@ -197,9 +208,6 @@ def generate(template: Path, output: Path, ttf: Path) -> None:
             rows = render_label(FRAME_LABELS[index], sub.width, sub.height, fg, shadow, ttf)
             encoded = b"".join(encode_row(row) for row in rows)
         else:
-            # Frames 17..19 are not used for the five runtime menu buttons.
-            # Preserve them exactly so the generated STI retains the template's
-            # complete structure instead of deleting unknown compatibility data.
             encoded = payload
 
         offset = len(new_pixels)
