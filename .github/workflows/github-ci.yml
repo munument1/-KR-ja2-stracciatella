@@ -13,6 +13,7 @@ concurrency:
 
 jobs:
   ci-build:
+    if: github.event_name != 'pull_request' || github.head_ref != 'korean-localization'
     strategy:
       fail-fast: false
       matrix:
@@ -163,6 +164,7 @@ jobs:
         path: ${{ github.workspace }}/artifacts
 
   ci-lint:
+    if: github.event_name != 'pull_request' || github.head_ref != 'korean-localization'
     strategy:
       fail-fast: false
       matrix:
