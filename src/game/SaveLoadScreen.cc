@@ -54,7 +54,7 @@
 constexpr int NUM_SAVE_GAMES = 11;
 
 
-#define SAVE_LOAD_NORMAL_FONT				FONT12ARIAL
+#define SAVE_LOAD_NORMAL_FONT				(isKoreanVersion() ? FONT14ARIAL : FONT12ARIAL)
 #define SAVE_LOAD_NORMAL_COLOR				2//FONT_MCOLOR_DKWHITE//2//FONT_MCOLOR_WHITE
 #define SAVE_LOAD_NORMAL_SHADOW_COLOR			118//121//118//125
 
@@ -1102,7 +1102,7 @@ static void InitSaveLoadScreenTextInputBoxes(void)
 
 	InitTextInputMode();
 	SetTextInputCursor(CUROSR_IBEAM_WHITE);
-	SetTextInputFont(FONT12ARIALFIXEDWIDTH);
+	SetTextInputFont(isKoreanVersion() ? FONT14ARIAL : FONT12ARIALFIXEDWIDTH);
 	Set16BPPTextFieldColor(Get16BPPColor(FROMRGB(0, 0, 0)));
 	SetBevelColors(Get16BPPColor(FROMRGB(136, 138, 135)), Get16BPPColor(FROMRGB(24, 61, 81)));
 	SetTextInputRegularColors(FONT_WHITE, 2);
