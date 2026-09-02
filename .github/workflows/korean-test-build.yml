@@ -9,8 +9,14 @@ on:
       - src/externalized/strings/Localization.cc
       - assets/externalized/strings/*-kor.json
       - assets/externalized/translation_tables/translation-table-kor.json
+      - assets/mods/korean-localization/data/BinaryData/**
+      - assets/mods/korean-localization/data/Fonts/**
+      - assets/mods/korean-localization/data/Loadscreens/**
       - tools/korean/validate_localization_strings.py
+      - tools/korean/validate_edt_layout.py
       - tools/korean/generate_korean_sti_fonts.py
+      - tools/korean/build_korean_runtime_assets.py
+      - tools/korean/import_korean_email_edt.py
       - tools/korean/apply_korean_font_aliases.py
 
 permissions:
@@ -74,9 +80,9 @@ jobs:
             "Commit: $GITHUB_SHA" \
             '' \
             'Korean externalized strings are enabled via the -kor localization suffix.' \
-            'Korean punctuation fallbacks cover ~, smart quotes, and corner brackets.' \
-            'Check New Game settings, Options, and main-menu copyright text.' \
-            'Check IMP profiles 051-056 and recruited Ira profile 059.' \
+            'Compact Korean UI fonts, including FONT10ARIAL, are generated from Galmuri9.' \
+            'EMAIL.EDT is imported from the legacy Korean patch and trimmed to the 448-record Stracciatella layout.' \
+            'Check New Game settings, Options, main-menu copyright, laptop email, IMP profiles 051-056, and recruited Ira profile 059.' \
             'MercEdt 040 and 046 were safely extended only across empty vanilla records.' \
             'MercEdt 200 is intentionally omitted because profile 200 is NO_PROFILE.' \
             > test-bundle/TEST_BUILD_INFO.txt
