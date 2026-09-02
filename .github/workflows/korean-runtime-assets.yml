@@ -23,6 +23,8 @@ permissions:
 jobs:
   build-assets:
     runs-on: ubuntu-24.04
+    outputs:
+      assets-changed: ${{ steps.commit-assets.outputs.changed }}
     steps:
       - name: Checkout Stracciatella Korean branch
         uses: actions/checkout@v4
@@ -129,8 +131,8 @@ jobs:
           git push origin HEAD:korean-localization
           echo 'changed=true' >> "$GITHUB_OUTPUT"
 
-      - name: Dispatch Korean Windows test build
-        if: steps.commit-assets.outputs.changed == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run korean-test-build.yml --ref korean-localization
+  windows-test-build:
+    name: Korean Windows Test Build
+    needs: build-assets
+    if: needs.build-assets.outputs.assets-changed == 'true'
+    uses: ./.github/workflows/korean-test-build.yml
