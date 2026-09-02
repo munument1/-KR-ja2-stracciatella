@@ -30,6 +30,15 @@ REQUIRED = (
         reason="Email bodies are still loaded from BinaryData/EMAIL.EDT at runtime.",
     ),
     RequiredAsset(
+        "BinaryData/FLOWERDESC.EDT",
+        size=9_600,
+        reason=(
+            "Florist.cc uses EDTFile::FLORIST_DESCRIPTIONS, which maps to "
+            "BinaryData/flowerdesc.edt; the gallery exposes 10 rows of "
+            "80+80+320 UTF-16 characters."
+        ),
+    ),
+    RequiredAsset(
         "Loadscreens/ja2logo.sti",
         size=22_505,
         magic=b"STCI",
@@ -45,8 +54,7 @@ REVIEWED_EXCLUSIONS = (
     ("BinaryData/MERCBIOS.EDT", "M.E.R.C. biographies are externalized in MERCListingModel."),
     ("BinaryData/BRAYDESC.EDT", "Bobby Ray item names/descriptions are provided by ItemModel."),
     ("BinaryData/ITEMDESC.EDT", "Item descriptions are externalized in ItemModel."),
-    ("BinaryData/FLOWERDESC.EDT", "Legacy florist description EDT is not referenced by current Stracciatella source."),
-    ("BinaryData/FLWRDESC.EDT", "Legacy florist description EDT is not referenced by current Stracciatella source."),
+    ("BinaryData/FLWRDESC.EDT", "Obsolete duplicate filename; Stracciatella maps florist descriptions to flowerdesc.edt."),
     ("TableData/DifficultySettings.xml", "JA2 1.13-only gameplay data; no Stracciatella runtime reference."),
     ("TableData/EnemyTaunts", "JA2 1.13-only feature data; no Stracciatella runtime reference."),
     ("Interface/RoleIcons.sti", "JA2 1.13 UI-extension asset; no current Stracciatella filename reference."),
