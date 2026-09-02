@@ -7,7 +7,6 @@ on:
     paths:
       - .github/workflows/korean-test-build.yml
       - src/externalized/strings/Localization.cc
-      - src/game/SaveLoadScreen.cc
       - assets/externalized/strings/*-kor.json
       - assets/externalized/translation_tables/translation-table-kor.json
       - assets/mods/korean-localization/data/BinaryData/**
@@ -16,10 +15,14 @@ on:
       - tools/korean/validate_localization_strings.py
       - tools/korean/validate_edt_layout.py
       - tools/korean/audit_runtime_assets.py
+      - tools/korean/audit_korean_translation_text.py
       - tools/korean/generate_korean_sti_fonts.py
+      - tools/korean/generate_korean_titletext.py
+      - tools/korean/import_korean_legacy_binarydata.py
       - tools/korean/build_korean_runtime_assets.py
       - tools/korean/import_korean_email_edt.py
       - tools/korean/apply_korean_font_aliases.py
+      - tools/korean/ensure_korean_font_symbols.py
 
 permissions:
   contents: read
@@ -34,48 +37,36 @@ jobs:
           ref: korean-localization
 
       - name: Validate Korean localization strings
-        shell: bash
         run: python3 tools/korean/validate_localization_strings.py
-
-      - name: Validate Korean font fallback aliases
-        shell: bash
-        run: python3 tools/korean/apply_korean_font_aliases.py --check
-
-      - name: Validate Korean runtime assets
-        shell: bash
-        run: python3 tools/korean/audit_runtime_assets.py
-
-      - name: Verify Korean runtime suffix
-        shell: bash
+      - name: Validate Korean font mappings
         run: |
-          grep -F 'case VanillaVersion::KOREAN:       return "-kor";' src/externalized/strings/Localization.cc
-
+          python3 tools/korean/apply_korean_font_aliases.py --check
+          python3 tools/korean/ensure_korean_font_symbols.py --check
+      - name: Validate Korean runtime assets
+        run: |
+          python3 tools/korean/audit_runtime_assets.py
+          python3 tools/korean/audit_korean_translation_text.py
+          python3 tools/korean/audit_edt_text.py --fail-on-suspicious
+      - name: Verify Korean runtime suffix
+        run: grep -F 'case VanillaVersion::KOREAN:       return "-kor";' src/externalized/strings/Localization.cc
       - name: Set up mingw64 environment
-        shell: bash
         env:
           CI_TARGET: linux-mingw64
           TARGET_GCC_MAJOR_VERSION: 10
         run: |
           . "$GITHUB_WORKSPACE/.ci/ci-setup.sh" 2>&1
           echo "PATH=$PATH" >> "$GITHUB_ENV"
-
       - name: Build and test
-        shell: bash
         env:
           CI_NAME: Korean-Windows-Test
           CI_OS: ubuntu-24.04
           CI_TARGET: linux-mingw64
           CI_REF: ${{ github.ref }}
           GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          "$GITHUB_WORKSPACE/.ci/ci-build.sh" 2>&1
-
+        run: "$GITHUB_WORKSPACE/.ci/ci-build.sh" 2>&1
       - name: Validate Korean EDT
-        shell: bash
         run: python tools/korean/validate_edt_layout.py
-
       - name: Assemble bundle
-        shell: bash
         run: |
           set -e
           mkdir -p test-bundle/build-packages
@@ -86,16 +77,14 @@ jobs:
             "Commit: $GITHUB_SHA" \
             '' \
             'Korean externalized strings are enabled via the -kor localization suffix.' \
-            'Compact Korean UI fonts, including FONT10ARIAL, are generated from Galmuri9.' \
-            'Korean save/load slot text and save-name input use the larger FONT14ARIAL/Galmuri14 path.' \
-            'EMAIL.EDT is imported from the legacy Korean patch and trimmed to the 448-record Stracciatella layout.' \
-            'The legacy Korean JA2 main-menu logo is included as Loadscreens/ja2logo.sti.' \
-            'Runtime asset audit validates EMAIL.EDT and the Korean JA2 logo before packaging.' \
-            'Check New Game settings, Options, Save/Load, main-menu logo/copyright, laptop email, IMP profiles 051-056, and recruited Ira profile 059.' \
-            'MercEdt 040 and 046 were safely extended only across empty vanilla records.' \
-            'MercEdt 200 is intentionally omitted because profile 200 is NO_PROFILE.' \
+            'Small Korean UI fonts are generated from Galmuri9; the baked main-menu labels use Galmuri14.' \
+            'U+00B7 middle dot has a validated Korean runtime font mapping.' \
+            'AIM and MERC biographies use vanilla-layout Korean AIMBIOS/MERCBIOS data.' \
+            'Vanilla item and Bobby Ray names/descriptions are rebuilt from the Korean 1.13 item translation.' \
+            'IMP and the newly imported BinaryData pass the high-confidence English-fallback audit.' \
+            'EMAIL.EDT is imported from the legacy Korean patch and trimmed to the Stracciatella layout.' \
+            'Check main-menu label size, AIM biographies/additional info/equipment, MERC biographies, IMP, Bobby Ray and item descriptions.' \
             > test-bundle/TEST_BUILD_INFO.txt
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

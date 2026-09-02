@@ -7,10 +7,13 @@ on:
       - .github/workflows/korean-runtime-assets.yml
       - tools/korean/build_korean_runtime_assets.py
       - tools/korean/import_korean_email_edt.py
+      - tools/korean/import_korean_legacy_binarydata.py
       - tools/korean/generate_korean_sti_fonts.py
       - tools/korean/generate_korean_titletext.py
+      - tools/korean/ensure_korean_font_symbols.py
       - tools/korean/validate_edt_layout.py
       - tools/korean/audit_runtime_assets.py
+      - tools/korean/audit_korean_translation_text.py
   workflow_dispatch:
 
 permissions:
@@ -38,10 +41,18 @@ jobs:
           python3 tools/korean/build_korean_runtime_assets.py \
             --ttf-dir "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/Fonts"
 
-      - name: Generate Korean main-menu title text
+      - name: Ensure Korean punctuation mappings
+        run: python3 tools/korean/ensure_korean_font_symbols.py
+
+      - name: Generate larger Korean main-menu title text
         run: |
           python3 tools/korean/generate_korean_titletext.py \
-            --ttf "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/Fonts/Galmuri11Bitmap-Regular-2.40.4.ttf"
+            --ttf "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/Fonts/Galmuri14Bitmap-Regular-2.40.4.ttf"
+
+      - name: Import Korean AIM MERC and item text
+        run: |
+          python3 tools/korean/import_korean_legacy_binarydata.py \
+            --legacy-root "$RUNNER_TEMP/legacy-ja2-korean"
 
       - name: Import vanilla-compatible Korean email data
         run: |
@@ -52,40 +63,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           import_npc() {
-            local src="$1"
-            local name="$2"
-            local expected_src_size="$3"
-            local expected_ref_size="$4"
-            local label="$5"
+            local src="$1" name="$2" expected_src_size="$3" expected_ref_size="$4" label="$5"
             local ref="assets/mods/simplified-chinese-localization/data/npcdata/$name"
             local dst="assets/mods/korean-localization/data/NPCData/$name"
-
-            test -f "$src"
-            test -f "$ref"
-            local src_size="$(stat -c %s "$src")"
-            local ref_size="$(stat -c %s "$ref")"
-            test "$src_size" -eq "$expected_src_size"
-            test "$ref_size" -eq "$expected_ref_size"
-            test $((src_size % 480)) -eq 0
-            test $((ref_size % 480)) -eq 0
-            test "$src_size" -ge "$ref_size"
-            mkdir -p "$(dirname "$dst")"
-            head -c "$ref_size" "$src" > "$dst"
+            test -f "$src"; test -f "$ref"
+            local src_size="$(stat -c %s "$src")" ref_size="$(stat -c %s "$ref")"
+            test "$src_size" -eq "$expected_src_size"; test "$ref_size" -eq "$expected_ref_size"
+            test $((src_size % 480)) -eq 0; test $((ref_size % 480)) -eq 0; test "$src_size" -ge "$ref_size"
+            mkdir -p "$(dirname "$dst")"; head -c "$ref_size" "$src" > "$dst"
             test "$(stat -c %s "$dst")" -eq "$ref_size"
             echo "Imported $label $name: $((src_size / 480)) legacy records -> $((ref_size / 480)) vanilla records"
           }
-
-          import_npc \
-            "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/NPCData/097.EDT" \
-            097.EDT 27840 26400 SKYRIDER
-          import_npc \
-            "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/NPCData/138.EDT" \
-            138.EDT 13440 10560 WALDO
-          import_npc \
-            "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data-1.13/NpcData/159.EDT" \
-            159.EDT 42240 36480 SPECK
+          import_npc "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/NPCData/097.EDT" 097.EDT 27840 26400 SKYRIDER
+          import_npc "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/NPCData/138.EDT" 138.EDT 13440 10560 WALDO
+          import_npc "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data-1.13/NpcData/159.EDT" 159.EDT 42240 36480 SPECK
 
       - name: Import Korean main-menu logo
         shell: bash
@@ -93,18 +85,19 @@ jobs:
           set -e
           src="$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/Loadscreens/Ja2Logo.sti"
           dst="assets/mods/korean-localization/data/Loadscreens/ja2logo.sti"
-          test -f "$src"
-          test "$(head -c 4 "$src")" = 'STCI'
-          mkdir -p "$(dirname "$dst")"
-          cp "$src" "$dst"
+          test -f "$src"; test "$(head -c 4 "$src")" = 'STCI'
+          mkdir -p "$(dirname "$dst")"; cp "$src" "$dst"
           test "$(stat -c %s "$dst")" -eq 22505
 
       - name: Validate generated localization assets
         run: |
           python3 tools/korean/apply_korean_font_aliases.py --check
+          python3 tools/korean/ensure_korean_font_symbols.py --check
           python3 tools/korean/validate_localization_strings.py
           python3 tools/korean/validate_edt_layout.py
           python3 tools/korean/audit_runtime_assets.py
+          python3 tools/korean/audit_korean_translation_text.py
+          python3 tools/korean/audit_edt_text.py --fail-on-suspicious
           git diff --check
 
       - name: Commit generated runtime assets
@@ -113,7 +106,11 @@ jobs:
         run: |
           git add \
             assets/mods/korean-localization/data/Fonts \
+            assets/mods/korean-localization/data/BinaryData/AIMBIOS.EDT \
+            assets/mods/korean-localization/data/BinaryData/BRAYDESC.EDT \
             assets/mods/korean-localization/data/BinaryData/EMAIL.EDT \
+            assets/mods/korean-localization/data/BinaryData/ITEMDESC.EDT \
+            assets/mods/korean-localization/data/BinaryData/MERCBIOS.EDT \
             assets/mods/korean-localization/data/NPCData/097.EDT \
             assets/mods/korean-localization/data/NPCData/138.EDT \
             assets/mods/korean-localization/data/NPCData/159.EDT \
@@ -122,12 +119,11 @@ jobs:
             assets/externalized/translation_tables/translation-table-kor.json
           if git diff --cached --quiet; then
             echo 'No generated Korean runtime asset changes to commit.'
-            echo 'changed=false' >> "$GITHUB_OUTPUT"
-            exit 0
+            echo 'changed=false' >> "$GITHUB_OUTPUT"; exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'fix(korean): rebuild runtime localization assets'
+          git commit -m 'fix(korean): rebuild complete runtime localization assets'
           git fetch origin korean-localization
           git rebase origin/korean-localization
           git push origin HEAD:korean-localization
