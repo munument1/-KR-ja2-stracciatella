@@ -37,39 +37,45 @@ jobs:
           python3 tools/korean/audit_korean_translation_text.py
           python3 tools/korean/audit_edt_text.py --fail-on-suspicious
 
-      - name: Assemble lightweight Korean overlay
+      - name: Assemble single-folder Korean mod
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p test-patch/mods
-          mkdir -p test-patch/externalized/strings
-          mkdir -p test-patch/externalized/translation_tables
+          rm -rf test-patch
+          mkdir -p test-patch/korean-localization
 
-          cp -a assets/mods/korean-localization test-patch/mods/
-          cp assets/externalized/strings/*-kor.json test-patch/externalized/strings/
+          cp -a assets/mods/korean-localization/. test-patch/korean-localization/
+          mkdir -p test-patch/korean-localization/data/strings
+          mkdir -p test-patch/korean-localization/data/translation_tables
+          cp assets/externalized/strings/*-kor.json \
+            test-patch/korean-localization/data/strings/
           cp assets/externalized/translation_tables/translation-table-kor.json \
-            test-patch/externalized/translation_tables/
+            test-patch/korean-localization/data/translation_tables/
 
-          cat > test-patch/TEST_PATCH_INFO.txt <<EOF
-          JA2-Stracciatella Korean asset-only test package
+          test -f test-patch/korean-localization/manifest.json
+          test -f test-patch/korean-localization/data/strings/translation-kor.json
+          test -f test-patch/korean-localization/data/translation_tables/translation-table-kor.json
+
+          cat > test-patch/korean-localization/TEST_PATCH_INFO.txt <<EOF
+          JA2-Stracciatella Korean localization mod test package
           Commit: $GITHUB_SHA
 
           This artifact intentionally contains no executable.
-          Overlay it onto a compatible Korean-enabled JA2-Stracciatella Windows build.
+          Install the korean-localization folder as one Stracciatella mod.
 
-          Included:
-          - mods/korean-localization
-          - externalized/strings/*-kor.json
-          - externalized/translation_tables/translation-table-kor.json
+          The package combines:
+          - Korean EDT/dialogue/font/STI assets
+          - Korean externalized *-kor.json strings
+          - Korean translation-table-kor.json
 
           Asset-only changes do not require rebuilding Stracciatella.
-          Build a fresh Windows executable only when src/, rust/, .ci/, cmake/ or other build/runtime source changes.
+          A Korean-enabled engine is required until Korean resource-version support is available upstream.
           EOF
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: JA2-Stracciatella-Korean-Assets-Test
+          name: JA2-Stracciatella-Korean-Localization-Mod
           path: test-patch
           if-no-files-found: error
           retention-days: 14
