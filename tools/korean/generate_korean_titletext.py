@@ -30,6 +30,7 @@ FRAME_LABELS = {
     14: "종료", 15: "종료", 16: "종료",
 }
 
+
 @dataclass(frozen=True)
 class SubImage:
     data_offset: int
@@ -44,8 +45,15 @@ class SubImage:
         return cls(*struct.unpack_from("<IIhhHH", data, offset))
 
     def pack(self) -> bytes:
-        return struct.pack("<IIhhHH", self.data_offset, self.data_length,
-                           self.offset_x, self.offset_y, self.height, self.width)
+        return struct.pack(
+            "<IIhhHH",
+            self.data_offset,
+            self.data_length,
+            self.offset_x,
+            self.offset_y,
+            self.height,
+            self.width,
+        )
 
 
 def decode_etrle(payload: bytes, width: int, height: int) -> list[list[int]]:
@@ -80,7 +88,11 @@ def encode_row(row: list[int]) -> bytes:
     while i < len(row):
         transparent = row[i] == TRANSPARENT
         j = i + 1
-        while j < len(row) and (row[j] == TRANSPARENT) == transparent and j - i < RUN_LIMIT:
+        while (
+            j < len(row)
+            and (row[j] == TRANSPARENT) == transparent
+            and j - i < RUN_LIMIT
+        ):
             j += 1
         count = j - i
         if transparent:
@@ -98,14 +110,16 @@ def luma(rgb: tuple[int, int, int]) -> float:
     return 0.2126 * r + 0.7152 * g + 0.0722 * b
 
 
-def choose_frame_colors(rows: list[list[int]], palette: bytes) -> tuple[int, int | None]:
+def choose_frame_colors(
+    rows: list[list[int]], palette: bytes
+) -> tuple[int, int | None]:
     used = sorted({px for row in rows for px in row if px != TRANSPARENT})
     if not used:
         return 1, None
 
     def rgb(idx: int) -> tuple[int, int, int]:
         off = idx * 3
-        vals = palette[off:off + 3]
+        vals = palette[off : off + 3]
         return vals[0], vals[1], vals[2]
 
     foreground = max(used, key=lambda idx: luma(rgb(idx)))
@@ -114,28 +128,47 @@ def choose_frame_colors(rows: list[list[int]], palette: bytes) -> tuple[int, int
     return foreground, shadow
 
 
-def fit_font(ttf: Path, text: str, max_width: int, max_height: int) -> ImageFont.FreeTypeFont:
-    # Galmuri Bitmap TTFs expose only their native bitmap strike size(s).
-    # Pillow raises OSError("invalid pixel size") for unsupported sizes, so
-    # probe downward and simply skip sizes the font does not provide.
+def fit_font(
+    ttf: Path, text: str, max_width: int, max_height: int
+) -> ImageFont.FreeTypeFont:
+    """Load the largest native bitmap strike that actually fits the frame.
+
+    Galmuri Bitmap TTFs expose discrete strike sizes. Pillow raises
+    OSError("invalid pixel size") for sizes that are not present. TITLETEXT frames
+    are only about 22 pixels tall, but Galmuri14's loadable strike can be 21px,
+    so probing only max_height..6 misses it after the frame padding is removed.
+    Probe a wider range and judge the rendered bounding box instead.
+    """
     supported: list[int] = []
-    for size in range(max_height, 5, -1):
+    candidates = list(range(max(32, max_height * 2), 5, -1))
+    for fallback in (32, 28, 24, 21, 20, 18, 16, 14, 12, 11, 10, 9, 8):
+        if fallback not in candidates:
+            candidates.append(fallback)
+
+    for size in candidates:
         try:
             font = ImageFont.truetype(str(ttf), size=size)
-        except OSError:
+        except (OSError, ValueError):
             continue
         supported.append(size)
         box = font.getbbox(text)
         if box[2] - box[0] <= max_width and box[3] - box[1] <= max_height:
             return font
+
     raise ValueError(
         f"cannot fit {text!r} into {max_width}x{max_height}; "
         f"supported bitmap sizes tried: {supported}"
     )
 
 
-def render_label(text: str, width: int, height: int, foreground: int,
-                 shadow: int | None, ttf: Path) -> list[list[int]]:
+def render_label(
+    text: str,
+    width: int,
+    height: int,
+    foreground: int,
+    shadow: int | None,
+    ttf: Path,
+) -> list[list[int]]:
     font = fit_font(ttf, text, max(1, width - 4), max(1, height - 2))
     mask = Image.new("L", (width, height), 0)
     draw = ImageDraw.Draw(mask)
@@ -180,7 +213,9 @@ def generate(template: Path, output: Path, ttf: Path) -> None:
     if color_count != 256:
         raise ValueError(f"expected 256 colors, got {color_count}")
     if sub_count != EXPECTED_FRAME_COUNT:
-        raise ValueError(f"expected {EXPECTED_FRAME_COUNT} TITLETEXT frames, got {sub_count}")
+        raise ValueError(
+            f"expected {EXPECTED_FRAME_COUNT} TITLETEXT frames, got {sub_count}"
+        )
 
     palette_start = STCI_HEADER_SIZE
     palette_end = palette_start + color_count * 3
@@ -191,29 +226,42 @@ def generate(template: Path, output: Path, ttf: Path) -> None:
         raise ValueError("truncated TITLETEXT template")
 
     palette = raw[palette_start:palette_end]
-    subs = [SubImage.unpack_from(raw, sub_start + i * SUBIMAGE_SIZE) for i in range(sub_count)]
+    subs = [
+        SubImage.unpack_from(raw, sub_start + i * SUBIMAGE_SIZE)
+        for i in range(sub_count)
+    ]
     old_pixels = raw[sub_end:pixel_end]
     trailing = raw[pixel_end:]
 
     new_pixels = bytearray()
     new_subs: list[SubImage] = []
     for index, sub in enumerate(subs):
-        payload = old_pixels[sub.data_offset:sub.data_offset + sub.data_length]
+        payload = old_pixels[sub.data_offset : sub.data_offset + sub.data_length]
         if len(payload) != sub.data_length:
             raise ValueError(f"frame {index}: truncated payload")
 
         if index in FRAME_LABELS:
             old_rows = decode_etrle(payload, sub.width, sub.height)
             fg, shadow = choose_frame_colors(old_rows, palette)
-            rows = render_label(FRAME_LABELS[index], sub.width, sub.height, fg, shadow, ttf)
+            rows = render_label(
+                FRAME_LABELS[index], sub.width, sub.height, fg, shadow, ttf
+            )
             encoded = b"".join(encode_row(row) for row in rows)
         else:
             encoded = payload
 
         offset = len(new_pixels)
         new_pixels.extend(encoded)
-        new_subs.append(SubImage(offset, len(encoded), sub.offset_x, sub.offset_y,
-                                 sub.height, sub.width))
+        new_subs.append(
+            SubImage(
+                offset,
+                len(encoded),
+                sub.offset_x,
+                sub.offset_y,
+                sub.height,
+                sub.width,
+            )
+        )
 
     struct.pack_into("<I", header, 4, sum(s.width * s.height for s in new_subs))
     struct.pack_into("<I", header, 8, len(new_pixels))
@@ -231,19 +279,30 @@ def generate(template: Path, output: Path, ttf: Path) -> None:
     check = output.read_bytes()
     if check[:4] != b"STCI":
         raise ValueError("generated TITLETEXT has invalid magic")
-    print(f"Generated {output} ({len(check)} bytes, {len(new_subs)} frames; localized 0..16)")
+    print(
+        f"Generated {output} ({len(check)} bytes, {len(new_subs)} frames; localized 0..16)"
+    )
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--template", type=Path,
-        default=Path("assets/mods/simplified-chinese-localization/data/loadscreens/TITLETEXT.STI"))
-    parser.add_argument("--output", type=Path,
-        default=Path("assets/mods/korean-localization/data/Loadscreens/titletext.sti"))
+    parser.add_argument(
+        "--template",
+        type=Path,
+        default=Path(
+            "assets/mods/simplified-chinese-localization/data/loadscreens/TITLETEXT.STI"
+        ),
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("assets/mods/korean-localization/data/Loadscreens/titletext.sti"),
+    )
     parser.add_argument("--ttf", type=Path, required=True)
     args = parser.parse_args()
     generate(args.template, args.output, args.ttf)
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
