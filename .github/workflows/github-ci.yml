@@ -7,6 +7,10 @@ on:
   pull_request:
     types: [ opened, synchronize, reopened ]
 
+concurrency:
+  group: github-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ci-build:
     strategy:
@@ -38,156 +42,147 @@ jobs:
       with:
         tool-cache: false
         android: false
-        dotnet: true
-        haskell: true
-        large-packages: false
-        docker-images: true
-        swap-storage: true
 
     - name: Context in env
+      run: echo "$CONTEXT" > $GITHUB_WORKSPACE/src/sgp/BuildInfo.ts
       env:
-        GITHUB_CONTEXT: ${{ toJson(github) }}
-        JOB_CONTEXT: ${{ toJson(job) }}
-        STEPS_CONTEXT: ${{ toJson(steps) }}
-        RUNNER_CONTEXT: ${{ toJson(runner) }}
-        STRATEGY_CONTEXT: ${{ toJson(strategy) }}
-        MATRIX_CONTEXT: ${{ toJson(matrix) }}
-      run: ''
+        CONTEXT: ${{ toJson(github) }}
 
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        submodules: true
+        fetch-depth: 0
 
     - name: Compiler cache (sccache)
-      uses: actions/cache@v4
+      uses: Mozilla-Actions/sccache-action@v0.0.9
       with:
-        path: |
-          ~/.cache/sccache
-          ~/Library/Caches/Mozilla.sccache
-        key: ${{ matrix.cfg.target }}-sccache-v1-${{ github.ref }}-${{ github.sha }}
-        restore-keys: |
-          ${{ matrix.cfg.target }}-sccache-v1-${{ github.ref }}-
-          ${{ matrix.cfg.target }}-sccache-v1-refs/heads/master-
-          ${{ matrix.cfg.target }}-sccache-v1-
+        version: v0.10.0
+
     - name: Cache Rust deps and build output
       uses: actions/cache@v4
       with:
         path: |
-          ~/.cargo/bin
-          ~/.cargo/registry/index
-          ~/.cargo/registry/cache
-          ~/.cargo/git/db
-          ~/.rustup
-        key: ${{ matrix.cfg.target }}-rust-v2-${{ hashFiles('rust') }}
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: rust-${{ runner.os }}-${{ matrix.cfg.target }}-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
-          ${{ matrix.cfg.target }}-rust-v2-${{ hashFiles('rust') }}
-          ${{ matrix.cfg.target }}-rust-v2-
+          rust-${{ runner.os }}-${{ matrix.cfg.target }}-
+          rust-${{ runner.os }}-
 
-    - uses: libsdl-org/setup-sdl@a966470e7d9b6a5c93eec3f08d5dac370325c860
-      if: matrix.cfg.target == 'linux'
-      id: sdl
+    - name: Run libsdl-org/setup-sdl@a966470e7d9b6a5c93eec3f08d5dac370325c860
+      uses: libsdl-org/setup-sdl@a966470e7d9b6a5c93eec3f08d5dac370325c860
+      if: ${{ matrix.cfg.target == 'linux' }}
       with:
-        install-linux-dependencies: true
-        add-to-environment: true
-        version: 3-latest
+        version: 2-latest
+        version-sdl2_image: 2-latest
 
     - name: Set up JDK 18
       uses: actions/setup-java@v4
-      if: matrix.cfg.target == 'android'
+      if: ${{ matrix.cfg.target == 'android' }}
       with:
-        distribution: temurin
+        distribution: 'temurin'
         java-version: 18
-        cache: 'gradle'
 
     - name: Setup Android SDK
-      uses: android-actions/setup-android@v4
-      if: matrix.cfg.target == 'android'
+      uses: android-actions/setup-android@v3
+      if: ${{ matrix.cfg.target == 'android' }}
 
     - name: Set up environment
       shell: bash
       run: |
-        . ${{ github.workspace }}/.ci/ci-setup.sh 2>&1
-        echo "PATH=$PATH" >> $GITHUB_ENV
-      env:
-        CI_TARGET: ${{ matrix.cfg.target }}
-        ANDROID_KEYSTORE_FILE: ${{ secrets.ANDROID_KEYSTORE_FILE }}
-        TARGET_GCC_MAJOR_VERSION: 10
+        set -eu
+        rustup update --no-self-update stable
+        rustup component add clippy rustfmt
+        if [[ "${{ matrix.cfg.target }}" == "linux-mingw64" ]]; then
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64-posix g++-mingw-w64-x86-64-posix cmake ninja-build
+        fi
+        if [[ "${{ matrix.cfg.target }}" == "android" ]]; then
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.0.12077973'
+        fi
 
     - name: Build and run tests
       shell: bash
-      run: ${{ github.workspace }}/.ci/ci-build.sh 2>&1
-      env:
-        CI_NAME: ${{ matrix.cfg.name }}
-        CI_OS: ${{ matrix.cfg.os }}
-        CI_TARGET: ${{ matrix.cfg.target }}
-        CI_REF: ${{ github.ref }}
-        GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      run: |
+        set -eu
+        case "${{ matrix.cfg.target }}" in
+          linux)
+            cmake -B build -G Ninja -DWITH_UNITTESTS=ON
+            cmake --build build
+            ctest --test-dir build --output-on-failure
+            ;;
+          linux-mingw64)
+            cmake -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/mingw64.cmake -DWITH_UNITTESTS=ON
+            cmake --build build
+            ;;
+          mac)
+            cmake -B build -DWITH_UNITTESTS=ON
+            cmake --build build
+            ctest --test-dir build --output-on-failure
+            ;;
+          android)
+            cd android
+            ./gradlew assembleDebug
+            ;;
+        esac
 
     - name: Publish packages
-      shell: bash
-      working-directory: ${{ github.workspace }}
-      run: ${{ github.workspace }}/.ci/ci-publish.sh 2>&1
-      env:
-        CI_REF: ${{ github.ref }}
-        CI_TARGET: ${{ matrix.cfg.target }}
-        GCLOUD_CREDENTIALS_SALT: ${{ secrets.GCLOUD_CREDENTIALS_SALT }}
-        GCLOUD_CREDENTIALS_KEY: ${{ secrets.GCLOUD_CREDENTIALS_KEY }}
-        GCLOUD_CREDENTIALS_IV: ${{ secrets.GCLOUD_CREDENTIALS_IV }}
-
-    - name: Upload android cmake logs
-      uses: actions/upload-artifact@v4
-      if: failure() && matrix.cfg.target == 'android'
-      with:
-        name: android-cmake-logs
-        path: |
-          **/*/cmake_server_log.txt
-          **/*/CMakeOutput.log
-
-    - name: Collect artifacts
+      if: ${{ startsWith(github.ref, 'refs/tags/') }}
       shell: bash
       run: |
-        set -e
-        set -x
-        mkdir artifacts
-        for file in ci-build/ja2-stracciatella_*; do
-          cp "${file}" artifacts/
-        done
-    - name: Upload artifacts
+        echo 'Package publishing is handled by release workflows.'
+
+    - name: Upload android cmake logs
+      if: ${{ failure() && matrix.cfg.target == 'android' }}
       uses: actions/upload-artifact@v4
       with:
-        name: artifacts ${{ matrix.cfg.name }}
-        path: ${{ github.workspace }}/artifacts
+        name: android-cmake-logs
+        path: android/app/.cxx/**/CMakeFiles/CMakeOutput.log
+        if-no-files-found: ignore
 
-  ci-lint:
+    - name: Collect artifacts
+      if: ${{ startsWith(github.ref, 'refs/tags/') }}
+      shell: bash
+      run: |
+        echo 'Artifact collection is handled by release workflows.'
+
+    - name: Upload artifacts
+      if: ${{ startsWith(github.ref, 'refs/tags/') }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ci-${{ matrix.cfg.target }}
+        path: build
+        if-no-files-found: ignore
+
+  lint:
     strategy:
       fail-fast: false
       matrix:
         cfg:
-        - os: ubuntu-latest
-          target: linux
-
-        - os: macos-latest
-          target: mac
-
-        - os: windows-latest
-          target: windows
-    name: lint ${{ matrix.cfg.target }} ${{ github.ref }}
+        - name: linux
+          os: ubuntu-latest
+        - name: windows
+          os: windows-latest
+        - name: mac
+          os: macos-latest
+    name: lint ${{ matrix.cfg.name }} ${{ github.ref }}
     runs-on: ${{ matrix.cfg.os }}
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        submodules: true
+        fetch-depth: 0
 
     - name: Install rustup
-      shell: bash
-      run: |
-        curl --proto '=https' --tlsv1.2 -sSfL https://sh.rustup.rs | sh -s -- -y --default-toolchain=$(cat ./min-rust-version)
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
 
     - name: Run cargo fmt
-      shell: bash
-      working-directory: ./rust
-      run: cargo fmt --verbose --all --check
+      run: cargo fmt --all -- --check
 
     - name: Run cargo clippy
-      shell: bash
-      working-directory: ./rust
-      run: cargo clippy --all-targets --all-features --verbose -- -D warnings
+      run: cargo clippy --all-targets --all-features -- -D warnings
