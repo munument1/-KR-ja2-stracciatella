@@ -21,25 +21,18 @@ import struct
 MAIL_RECORD_SIZE = 320
 MAIL_RECORD_CHARS = MAIL_RECORD_SIZE // 2
 
-# Exact legacy source text is asserted before rewriting. This makes the fix
-# fail closed if the upstream Korean patch changes instead of silently editing
-# a different record.
-FULL_WIDTH_RECORD_FIXES = {
+# Use anchored substitutions instead of matching the whole legacy string.
+# This still fails closed if the expected Korean phrase is absent, while
+# tolerating harmless differences in the deliberately garbled terminal text
+# embedded in Grizzly's answering-machine message.
+FULL_WIDTH_RECORD_FIXES: dict[int, tuple[tuple[str, str], ...]] = {
     130: (
-        "내 기계에 메사지를 남겼더군. 나 도라왔다. 다음에는 내가 있을 때 연락해라. "
-        "이 기술 쓰레기 정말 싫다. EXIT exit Send sned help stoip stop SEND "
-        "\\\\http:stop //http:stop send. send /send ?help stop. SEND S",
-        "내 기계에 메시지를 남겼더군. 나 돌아왔다. 다음에는 내가 있을 때 연락해라. "
-        "이 쓰레기 정말 싫다. EXIT exit Send sned help stoip stop SEND "
-        "\\\\http:stop //http:stop send. send /send ?help stop. SEND S",
+        ("메사지를", "메시지를"),
+        ("도라왔다", "돌아왔다"),
+        ("이 기술 쓰레기 정말 싫다.", "이 쓰레기 정말 싫다."),
     ),
     312: (
-        "당신의 메시지는 매우 고무적이었습니다. 이제 이 대의가 절망적이지 않다고 받아들이기 시작했습니다. "
-        "제 뜻을 오해하지 마십시오. 저는 늘 당신을 믿었고, 그렇지 않았다면 가진 모든 것을 맡기지 않았을 것입니다. "
-        "하지만 이 오랜 세월이 흐른 뒤 아룰코가 해방될 수 있다고 믿기는 어렵습니다.",
-        "당신의 메시지는 매우 고무적이었습니다. 이제 이 대의가 절망적이지 않다고 느끼기 시작했습니다. "
-        "제 뜻을 오해하지 마십시오. 저는 늘 당신을 믿었고, 그렇지 않았다면 가진 모든 것을 맡기지 않았을 것입니다. "
-        "하지만 이 오랜 세월이 흐른 뒤 아룰코가 해방될 수 있다고 믿기는 어렵습니다.",
+        ("절망적이지 않다고 받아들이기 시작했습니다.", "절망적이지 않다고 느끼기 시작했습니다."),
     ),
 }
 
@@ -65,20 +58,30 @@ def encrypt_record(text: str) -> bytes:
 
 
 def apply_full_width_fixes(data: bytearray) -> None:
-    for record_index, (expected, replacement) in FULL_WIDTH_RECORD_FIXES.items():
+    for record_index, substitutions in FULL_WIDTH_RECORD_FIXES.items():
         start = record_index * MAIL_RECORD_SIZE
         end = start + MAIL_RECORD_SIZE
-        actual = decrypt_record(bytes(data[start:end]))
-        if actual != expected:
+        original = decrypt_record(bytes(data[start:end]))
+        if len(original) != MAIL_RECORD_CHARS:
             raise SystemExit(
-                f"EMAIL.EDT record {record_index} no longer matches the expected legacy text; "
-                "refusing to rewrite it"
+                f"EMAIL.EDT record {record_index} is no longer exactly {MAIL_RECORD_CHARS} chars; "
+                "refusing to apply the legacy full-width fix"
             )
+
+        replacement = original
+        for old, new in substitutions:
+            if old not in replacement:
+                raise SystemExit(
+                    f"EMAIL.EDT record {record_index} does not contain expected phrase {old!r}; "
+                    "refusing to rewrite it"
+                )
+            replacement = replacement.replace(old, new, 1)
+
         data[start:end] = encrypt_record(replacement)
         if decrypt_record(bytes(data[start:end])) != replacement:
             raise SystemExit(f"EMAIL.EDT record {record_index} rewrite verification failed")
         print(
-            f"EMAIL.EDT record {record_index}: shortened {len(expected)} -> {len(replacement)} chars "
+            f"EMAIL.EDT record {record_index}: shortened {len(original)} -> {len(replacement)} chars "
             "to preserve the runtime NUL terminator"
         )
 
