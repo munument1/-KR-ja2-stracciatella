@@ -3,9 +3,9 @@
 
 Classic EDT files contain fixed-width, ROT-1-obfuscated UTF-16LE strings and
 carry no layout metadata. This validator mirrors the layouts used by the
-Stracciatella loaders and also compares Korean files with the bundled
-Simplified Chinese localization, which is used by the Korean import tools as
-an exact vanilla/Stracciatella byte-size reference.
+Stracciatella loaders and compares Korean files with the bundled Simplified
+Chinese localization, which is used as an exact vanilla/Stracciatella layout
+reference.
 """
 
 from __future__ import annotations
@@ -23,8 +23,24 @@ EXPECTED_COUNTS = {
     # 70 translated/safely reconstructed runtime files. 200.EDT is the
     # NO_PROFILE sentinel and intentionally remains a base-game fallback.
     "MercEdt": 70,
-    "NPCData": 161,
+    # Includes SKYRIDER (097.EDT).  The previous 161-file count accidentally
+    # omitted this valid vanilla NPC dialogue file.
+    "NPCData": 162,
     "BinaryData": 16,
+}
+
+# Exact translated MercEdt profile set.  A count alone can miss a replacement
+# error where one required profile disappears and another file is added.
+EXPECTED_MERC_NAMES = {
+    *(f"{i:03d}.EDT" for i in range(62)),
+    "063.EDT",
+    "064.EDT",
+    "066.EDT",
+    "067.EDT",
+    "068.EDT",
+    "069.EDT",
+    "070.EDT",
+    "072.EDT",
 }
 
 # Character widths, as passed to openEDT()/loadEncryptedString().
@@ -180,8 +196,7 @@ def validate_field(
                 "INFO" if reference_full else "WARNING",
                 path,
                 (
-                    "field has no on-disk NUL terminator; the same full-width "
-                    "layout is present in the reference"
+                    "field has no on-disk NUL terminator; the same full-width layout is present in the reference"
                     if reference_full
                     else "field has no on-disk NUL terminator; runtime will discard its final code unit"
                 ),
@@ -201,8 +216,7 @@ def validate_field(
                     "INFO" if inherited else "WARNING",
                     path,
                     (
-                        "non-zero UTF-16 data appears after the first NUL terminator; "
-                        "the same residue exists in the reference"
+                        "non-zero UTF-16 data appears after the first NUL terminator; the same residue exists in the reference"
                         if inherited
                         else "non-zero UTF-16 data appears after the first NUL terminator; Korean-only residue"
                     ),
@@ -237,6 +251,22 @@ def validate_field(
             break
 
 
+def report_set_difference(
+    *,
+    path: Path,
+    actual: set[str],
+    expected: set[str],
+    issues: list[Issue],
+    label: str,
+) -> None:
+    missing = sorted(expected - actual)
+    extra = sorted(actual - expected)
+    if missing:
+        issues.append(Issue("ERROR", path, f"missing {label}: {', '.join(missing)}"))
+    if extra:
+        issues.append(Issue("ERROR", path, f"unexpected {label}: {', '.join(extra)}"))
+
+
 def validate_group(
     *,
     group: str,
@@ -261,19 +291,23 @@ def validate_group(
             )
         )
 
+    actual_upper = {p.name.upper() for p in files}
     if group == "BinaryData":
-        actual = {p.name.upper() for p in files}
-        expected = set(BINARY_LAYOUTS)
-        missing = sorted(expected - actual)
-        extra = sorted(actual - expected)
-        if missing:
-            issues.append(
-                Issue("ERROR", directory, f"missing layout files: {', '.join(missing)}")
-            )
-        if extra:
-            issues.append(
-                Issue("ERROR", directory, f"unrecognized layout files: {', '.join(extra)}")
-            )
+        report_set_difference(
+            path=directory,
+            actual=actual_upper,
+            expected=set(BINARY_LAYOUTS),
+            issues=issues,
+            label="layout files",
+        )
+    elif group == "MercEdt":
+        report_set_difference(
+            path=directory,
+            actual=actual_upper,
+            expected=EXPECTED_MERC_NAMES,
+            issues=issues,
+            label="translated MercEdt files",
+        )
 
     reference_index: dict[str, Path] = {}
     if check_reference:
@@ -283,15 +317,31 @@ def validate_group(
             issues.append(Issue("ERROR", ref_dir, "reference EDT directory missing or empty"))
         reference_index = index_casefold(ref_files)
 
+        # NPCData is a direct runtime data family.  Require exact filename
+        # parity with the bundled vanilla reference so a valid NPC cannot
+        # silently fall back to English merely because the total count matches.
+        if group == "NPCData" and ref_files:
+            expected_npc = {
+                p.name.casefold()
+                for p in ref_files
+                if layout_for("NPCData", p.name) is not None
+            }
+            actual_npc = {p.name.casefold() for p in files}
+            report_set_difference(
+                path=directory,
+                actual=actual_npc,
+                expected=expected_npc,
+                issues=issues,
+                label="vanilla NPCData files",
+            )
+
     if verbose:
         print(f"[{group}]")
 
     for path in files:
         columns = layout_for(group, path.name)
         if columns is None:
-            issues.append(
-                Issue("ERROR", path, "no known Stracciatella EDT layout for this filename")
-            )
+            issues.append(Issue("ERROR", path, "no known Stracciatella EDT layout for this filename"))
             continue
 
         size = path.stat().st_size
@@ -300,9 +350,7 @@ def validate_group(
             issues.append(Issue("ERROR", path, "empty EDT file"))
             continue
         if size % BYTES_PER_CHAR:
-            issues.append(
-                Issue("ERROR", path, f"odd byte length {size}; not valid UTF-16 storage")
-            )
+            issues.append(Issue("ERROR", path, f"odd byte length {size}; not valid UTF-16 storage"))
             continue
 
         stride = row_bytes(columns)
@@ -328,9 +376,7 @@ def validate_group(
         if check_reference:
             ref = reference_index.get(path.name.casefold())
             if ref is None:
-                issues.append(
-                    Issue("ERROR", path, "no same-named Simplified Chinese vanilla-layout reference")
-                )
+                issues.append(Issue("ERROR", path, "no same-named Simplified Chinese vanilla-layout reference"))
             else:
                 ref_size = ref.stat().st_size
                 if ref_size != size:
@@ -363,8 +409,8 @@ def validate_group(
 
         if verbose:
             print(
-                f"  OK {path.name:<22} {size:>7} bytes  "
-                f"row={stride:>4}  records={records:>3}  columns={columns}"
+                f"  OK {path.name:<22} {size:>7} bytes  row={stride:>4}  "
+                f"records={records:>3}  columns={columns}"
             )
 
     print(
@@ -377,9 +423,7 @@ def validate_group(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     script_path = Path(__file__).resolve()
-    default_repo_root = (
-        script_path.parents[2] if len(script_path.parents) > 2 else Path.cwd()
-    )
+    default_repo_root = script_path.parents[2] if len(script_path.parents) > 2 else Path.cwd()
     parser.add_argument(
         "--repo-root",
         type=Path,
@@ -404,9 +448,7 @@ def main() -> int:
     args = parse_args()
     repo_root = args.repo_root.resolve()
     data_root = repo_root / "assets" / "mods" / "korean-localization" / "data"
-    reference_root = (
-        repo_root / "assets" / "mods" / "simplified-chinese-localization" / "data"
-    )
+    reference_root = repo_root / "assets" / "mods" / "simplified-chinese-localization" / "data"
 
     issues: list[Issue] = []
     totals = GroupStats()
