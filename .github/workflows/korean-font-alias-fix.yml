@@ -1,0 +1,43 @@
+name: Korean Font Alias Fix
+
+on:
+  push:
+    branches: [korean-localization]
+    paths:
+      - .github/workflows/korean-font-alias-fix.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: korean-localization
+          fetch-depth: 0
+
+      - name: Apply Korean font aliases
+        run: python3 tools/korean/apply_korean_font_aliases.py
+
+      - name: Verify patch
+        run: |
+          python3 tools/korean/apply_korean_font_aliases.py --check
+          git diff --check
+
+      - name: Commit generated changes
+        shell: bash
+        run: |
+          set -e
+          if git diff --quiet -- assets/externalized/translation_tables/translation-table-kor.json tools/korean/generate_korean_sti_fonts.py; then
+            echo "No generated changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/externalized/translation_tables/translation-table-kor.json tools/korean/generate_korean_sti_fonts.py
+          git commit -m "Add Korean punctuation font aliases"
+          git push origin HEAD:korean-localization
