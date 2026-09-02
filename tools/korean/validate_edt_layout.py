@@ -24,7 +24,7 @@ EXPECTED_COUNTS = {
     # NO_PROFILE sentinel and intentionally remains a base-game fallback.
     "MercEdt": 70,
     "NPCData": 161,
-    "BinaryData": 15,
+    "BinaryData": 16,
 }
 
 # Character widths, as passed to openEDT()/loadEncryptedString().
@@ -34,6 +34,9 @@ BINARY_LAYOUTS: dict[str, tuple[int, ...]] = {
     "ALUMNAME.EDT": (80,),
     "ALUMNI.EDT": (80, 560),
     "CREDITS.EDT": (80,),
+    # EMail.cc uses MAIL_STRING_SIZE == 320 bytes per encrypted record,
+    # corresponding to 160 UTF-16 code units on disk.
+    "EMAIL.EDT": (160,),
     "FILES.EDT": (400,),
     "FLOWERCARD.EDT": (400,),
     "FLOWERDESC.EDT": (80, 80, 320),
