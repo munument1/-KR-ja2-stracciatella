@@ -1,20 +1,12 @@
 #!/usr/bin/env python3
-"""Audit Korean JA2 Stracciatella runtime localization assets.
-
-This audit complements the JSON-string and EDT-layout validators.  It checks
-assets that the engine still opens directly at runtime and keeps a visible list
-of reviewed legacy exclusions and known visual-localization gaps.
-
-The legacy JA2 1.13 Korean patch contains many resources that Stracciatella does
-not consume, so legacy presence alone is never treated as proof that a file
-belongs in the vanilla-compatible Korean mod.
-"""
+"""Audit Korean JA2 Stracciatella runtime localization assets."""
 
 from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
+import struct
 import sys
 
 
@@ -26,9 +18,6 @@ class RequiredAsset:
     reason: str = ""
 
 
-# BinaryData files that are still consumed through EDTFile/openEDT() or direct
-# loadEncryptedString() calls.  Sizes match the bundled Simplified Chinese
-# vanilla/Stracciatella-layout reference used by validate_edt_layout.py.
 BINARY_SIZES = {
     "AIMHIST.EDT": 18_400,
     "AIMPOL.EDT": 36_800,
@@ -49,63 +38,31 @@ BINARY_SIZES = {
 }
 
 REQUIRED_FONT_FILES = {
-    "BLOCKFONT2.sti",
-    "BLOCKFONTNARROW.sti",
-    "CLOCKFONT.sti",
-    "COMPFONT.sti",
-    "FONT10ARIAL.sti",
-    "FONT10ARIALBOLD.sti",
-    "FONT10ROMAN.sti",
-    "FONT12ARIAL.sti",
-    "FONT12ARIALFIXEDWIDTH.sti",
-    "FONT12POINT1.sti",
-    "FONT12ROMAN.sti",
-    "FONT14ARIAL.sti",
-    "FONT14HUMANIST.sti",
-    "FONT14SANSERIF.sti",
-    "FONT14SANSSERIF.sti",
-    "FONT16ARIAL.sti",
-    "HUGEFONT.sti",
-    "LARGEFONT1.sti",
-    "MERCFONT.sti",
-    "SMALLCOMPFONT.sti",
-    "SMALLFONT1.sti",
-    "TINYFONT1.sti",
-    "blockfont.sti",
+    "BLOCKFONT2.sti", "BLOCKFONTNARROW.sti", "CLOCKFONT.sti", "COMPFONT.sti",
+    "FONT10ARIAL.sti", "FONT10ARIALBOLD.sti", "FONT10ROMAN.sti", "FONT12ARIAL.sti",
+    "FONT12ARIALFIXEDWIDTH.sti", "FONT12POINT1.sti", "FONT12ROMAN.sti", "FONT14ARIAL.sti",
+    "FONT14HUMANIST.sti", "FONT14SANSERIF.sti", "FONT14SANSSERIF.sti", "FONT16ARIAL.sti",
+    "HUGEFONT.sti", "LARGEFONT1.sti", "MERCFONT.sti", "SMALLCOMPFONT.sti",
+    "SMALLFONT1.sti", "TINYFONT1.sti", "blockfont.sti",
 }
 
 REQUIRED = tuple(
     RequiredAsset(
-        f"BinaryData/{name}",
-        size=size,
+        f"BinaryData/{name}", size=size,
         reason="Runtime EDT resource; exact vanilla-layout size is required.",
     )
     for name, size in BINARY_SIZES.items()
 ) + (
     RequiredAsset(
-        "Loadscreens/ja2logo.sti",
-        size=22_505,
-        magic=b"STCI",
+        "Loadscreens/ja2logo.sti", size=22_505, magic=b"STCI",
         reason="MainMenuScreen loads Loadscreens/ja2logo.sti directly.",
     ),
-)
-
-# Missing files here do not fail CI yet because there is no verified Korean
-# source asset to import.  They are nevertheless real runtime localization
-# gaps and must remain visible until deliberately localized or code-rendered.
-KNOWN_GAPS = (
-    (
-        "Loadscreens/titletext.sti",
-        "MainMenuScreen uses MLG_TITLETEXT for the five main-menu button images. "
-        "The Simplified Chinese localization supplies TITLETEXT.STI, while the "
-        "legacy Korean patch has no equivalent; Korean therefore falls back to "
-        "the English baked-text button graphic today.",
+    RequiredAsset(
+        "Loadscreens/titletext.sti", magic=b"STCI",
+        reason="MLG_TITLETEXT supplies the five localized main-menu button labels.",
     ),
 )
 
-# Reviewed legacy resources that should NOT be copied merely because they exist
-# in Jagged-Alliance2-korean.  Keep this list visible so future audits do not
-# repeatedly mistake externalized/1.13-only resources for localization gaps.
 REVIEWED_EXCLUSIONS = (
     ("BinaryData/AIMBIOS.EDT", "AIM biography text is externalized in Stracciatella models."),
     ("BinaryData/MERCBIOS.EDT", "M.E.R.C. biographies are externalized in MERCListingModel."),
@@ -124,18 +81,30 @@ def validate_required(root: Path, asset: RequiredAsset) -> list[str]:
     path = root / asset.path
     if not path.is_file():
         return [f"MISSING {asset.path}: {asset.reason}"]
-
     if asset.size is not None and path.stat().st_size != asset.size:
-        errors.append(
-            f"SIZE {asset.path}: expected {asset.size}, got {path.stat().st_size}"
-        )
+        errors.append(f"SIZE {asset.path}: expected {asset.size}, got {path.stat().st_size}")
     if asset.magic is not None:
         with path.open("rb") as f:
             got = f.read(len(asset.magic))
         if got != asset.magic:
-            errors.append(
-                f"MAGIC {asset.path}: expected {asset.magic!r}, got {got!r}"
-            )
+            errors.append(f"MAGIC {asset.path}: expected {asset.magic!r}, got {got!r}")
+    return errors
+
+
+def validate_titletext(root: Path) -> list[str]:
+    path = root / "Loadscreens/titletext.sti"
+    if not path.is_file():
+        return []
+    raw = path.read_bytes()
+    if len(raw) < 64:
+        return ["STRUCT Loadscreens/titletext.sti: shorter than STCI header"]
+    sub_count = struct.unpack_from("<H", raw, 28)[0]
+    flags = struct.unpack_from("<I", raw, 16)[0]
+    errors: list[str] = []
+    if sub_count != 17:
+        errors.append(f"STRUCT Loadscreens/titletext.sti: expected 17 frames, got {sub_count}")
+    if not (flags & 0x0008) or not (flags & 0x0020):
+        errors.append("STRUCT Loadscreens/titletext.sti: expected indexed ETRLE-compressed STI")
     return errors
 
 
@@ -144,11 +113,9 @@ def validate_fonts(root: Path) -> list[str]:
     font_dir = root / "Fonts"
     if not font_dir.is_dir():
         return ["MISSING Fonts: Korean STI font directory is absent"]
-
     actual = {p.name for p in font_dir.iterdir() if p.is_file()}
     for name in sorted(REQUIRED_FONT_FILES - actual):
         errors.append(f"MISSING Fonts/{name}: font is used by the JA2 font table")
-
     for name in sorted(REQUIRED_FONT_FILES & actual):
         path = font_dir / name
         with path.open("rb") as f:
@@ -160,11 +127,7 @@ def validate_fonts(root: Path) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--mod-dir",
-        type=Path,
-        default=Path("assets/mods/korean-localization/data"),
-    )
+    parser.add_argument("--mod-dir", type=Path, default=Path("assets/mods/korean-localization/data"))
     args = parser.parse_args()
 
     errors: list[str] = []
@@ -173,22 +136,15 @@ def main() -> int:
     for asset in REQUIRED:
         asset_errors = validate_required(args.mod_dir, asset)
         errors.extend(asset_errors)
-        state = "FAIL" if asset_errors else "OK"
-        print(f"{state:4} {asset.path} - {asset.reason}")
+        print(f"{'FAIL' if asset_errors else 'OK':4} {asset.path} - {asset.reason}")
+
+    title_errors = validate_titletext(args.mod_dir)
+    errors.extend(title_errors)
+    print(f"{'FAIL' if title_errors else 'OK':4} Loadscreens/titletext.sti - 17 indexed ETRLE button-state frames")
 
     font_errors = validate_fonts(args.mod_dir)
     errors.extend(font_errors)
-    print(
-        f"{'FAIL' if font_errors else 'OK':4} Fonts - "
-        f"{len(REQUIRED_FONT_FILES)} required STI font filenames and STCI headers"
-    )
-
-    print()
-    print("Known localization gaps")
-    print("=======================")
-    for path, reason in KNOWN_GAPS:
-        state = "OPEN" if not (args.mod_dir / path).is_file() else "DONE"
-        print(f"{state:4} {path} - {reason}")
+    print(f"{'FAIL' if font_errors else 'OK':4} Fonts - {len(REQUIRED_FONT_FILES)} required STI font filenames and STCI headers")
 
     print()
     print("Reviewed legacy exclusions")
@@ -204,10 +160,7 @@ def main() -> int:
         return 1
 
     print()
-    print(
-        f"Required runtime assets: {len(REQUIRED)} files + "
-        f"{len(REQUIRED_FONT_FILES)} fonts present and structurally valid"
-    )
+    print(f"Required runtime assets: {len(REQUIRED)} files + {len(REQUIRED_FONT_FILES)} fonts present and structurally valid")
     return 0
 
 
