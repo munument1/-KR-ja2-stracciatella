@@ -48,7 +48,8 @@ jobs:
           python3 tools/korean/audit_korean_translation_text.py
           python3 tools/korean/audit_edt_text.py --fail-on-suspicious
       - name: Verify Korean runtime suffix
-        run: grep -F 'case VanillaVersion::KOREAN:       return "-kor";' src/externalized/strings/Localization.cc
+        run: |
+          grep -F 'case VanillaVersion::KOREAN:       return "-kor";' src/externalized/strings/Localization.cc
       - name: Set up mingw64 environment
         env:
           CI_TARGET: linux-mingw64
