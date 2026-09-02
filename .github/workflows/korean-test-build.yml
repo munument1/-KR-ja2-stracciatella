@@ -64,7 +64,8 @@ jobs:
           CI_TARGET: linux-mingw64
           CI_REF: ${{ github.ref }}
           GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: "$GITHUB_WORKSPACE/.ci/ci-build.sh" 2>&1
+        run: |
+          "$GITHUB_WORKSPACE/.ci/ci-build.sh" 2>&1
       - name: Validate Korean EDT
         run: python tools/korean/validate_edt_layout.py
       - name: Assemble bundle
