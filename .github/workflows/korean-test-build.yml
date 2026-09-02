@@ -1,7 +1,6 @@
 name: Korean Windows Test Build
 
 on:
-  workflow_call:
   workflow_dispatch:
   push:
     branches: [korean-localization]
