@@ -40,12 +40,25 @@ jobs:
           python3 tools/korean/import_korean_email_edt.py \
             --legacy-root "$RUNNER_TEMP/legacy-ja2-korean"
 
+      - name: Import Korean main-menu logo
+        shell: bash
+        run: |
+          set -e
+          src="$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/Loadscreens/Ja2Logo.sti"
+          dst="assets/mods/korean-localization/data/Loadscreens/ja2logo.sti"
+          test -f "$src"
+          test "$(head -c 4 "$src")" = 'STCI'
+          mkdir -p "$(dirname "$dst")"
+          cp "$src" "$dst"
+          test "$(stat -c %s "$dst")" -eq 22505
+
       - name: Validate generated localization assets
         run: |
           python3 tools/korean/apply_korean_font_aliases.py --check
           python3 tools/korean/validate_localization_strings.py
           python3 tools/korean/validate_edt_layout.py
           test "$(stat -c %s assets/mods/korean-localization/data/BinaryData/EMAIL.EDT)" -eq 143360
+          test "$(head -c 4 assets/mods/korean-localization/data/Loadscreens/ja2logo.sti)" = 'STCI'
           git diff --check
 
       - name: Commit generated runtime assets
@@ -54,6 +67,7 @@ jobs:
           git add \
             assets/mods/korean-localization/data/Fonts \
             assets/mods/korean-localization/data/BinaryData/EMAIL.EDT \
+            assets/mods/korean-localization/data/Loadscreens/ja2logo.sti \
             assets/externalized/translation_tables/translation-table-kor.json
           if git diff --cached --quiet; then
             echo 'No generated Korean runtime asset changes to commit.'
@@ -61,5 +75,5 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'fix(korean): rebuild small fonts and import email text'
+          git commit -m 'fix(korean): rebuild runtime localization assets'
           git push origin HEAD:korean-localization
