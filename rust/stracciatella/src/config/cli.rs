@@ -91,7 +91,7 @@ impl Cli {
         opts.optopt(
             "",
             "resversion",
-            "Version of the game resources. Possible values: DUTCH, ENGLISH, FRENCH, GERMAN, ITALIAN, POLISH, RUSSIAN, RUSSIAN_GOLD, SIMPLIFIED_CHINESE. Default value is ENGLISH. RUSSIAN is for BUKA Agonia Vlasty release. RUSSIAN_GOLD is for Gold release",
+            "Version of the game resources. Possible values: DUTCH, ENGLISH, FRENCH, GERMAN, ITALIAN, POLISH, RUSSIAN, RUSSIAN_GOLD, SIMPLIFIED_CHINESE, KOREAN. Default value is ENGLISH. RUSSIAN is for BUKA Agonia Vlasty release. RUSSIAN_GOLD is for Gold release",
             "RUSSIAN_GOLD"
         );
         opts.optflag(
@@ -367,6 +367,21 @@ mod tests {
             None
         );
         assert_eq!(engine_options.resource_version, VanillaVersion::ITALIAN);
+    }
+
+    #[test]
+    fn apply_to_engine_options_should_return_the_correct_resversion_for_korean() {
+        let mut engine_options = EngineOptions::default();
+        let input = Cli::from_args(&[
+            String::from("ja2"),
+            String::from("-resversion"),
+            String::from("KOREAN"),
+        ]);
+        assert_eq!(
+            input.apply_to_engine_options(&mut engine_options).err(),
+            None
+        );
+        assert_eq!(engine_options.resource_version, VanillaVersion::KOREAN);
     }
 
     #[test]

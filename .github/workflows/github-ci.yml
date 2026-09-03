@@ -7,8 +7,13 @@ on:
   pull_request:
     types: [ opened, synchronize, reopened ]
 
+concurrency:
+  group: github-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ci-build:
+    if: github.event_name != 'pull_request' || github.head_ref != 'korean-localization'
     strategy:
       fail-fast: false
       matrix:
@@ -159,6 +164,7 @@ jobs:
         path: ${{ github.workspace }}/artifacts
 
   ci-lint:
+    if: github.event_name != 'pull_request' || github.head_ref != 'korean-localization'
     strategy:
       fail-fast: false
       matrix:

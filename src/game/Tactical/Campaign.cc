@@ -13,6 +13,7 @@
 #include "Sys_Globals.h"
 #include "Text.h"
 #include "GameSettings.h"
+#include "GameRes.h"
 #include "Assignments.h"
 #include "MapScreen.h"
 #include "Interface.h"
@@ -1389,6 +1390,14 @@ ST::string BuildStatChangeString(const ST::string& name, BOOLEAN fIncrease, INT1
 	{
 		// use "level/levels instead of point/points
 		ubStringIndex += 2;
+	}
+
+	if (isKoreanVersion())
+	{
+		return ST::format("{}: {} {}{} {}", name,
+			sStatGainStrings[ubStat - FIRST_CHANGEABLE_STAT], absPointsChanged,
+			sPreStatBuildString[ubStringIndex],
+			sPreStatBuildString[fIncrease ? 1 : 0]);
 	}
 
 	return ST::format("{} {} {} {} {}", name,

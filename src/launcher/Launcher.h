@@ -18,6 +18,7 @@ struct sortMods {
 };
 
 #define SIMPLIFIED_CHINESE_MOD_NAME "simplified-chinese-localization"
+#define KOREAN_MOD_NAME "korean-localization"
 
 class Launcher : public StracciatellaLauncher {
 public:

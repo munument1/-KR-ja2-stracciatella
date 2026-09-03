@@ -75,3 +75,36 @@ TEST(stringTest, Greek)
 	EXPECT_EQ(str[11], '\xAE');
 	EXPECT_EQ(str[12], '\0');
 }
+
+TEST(stringTest, Korean)
+{
+	const ST::string str = "한국어 테스트";
+	ASSERT_EQ(str.size(), 19u);
+	auto u32 = str.to_utf32();
+	ASSERT_EQ(u32.size(), 7u);
+	EXPECT_EQ(u32[0], char32_t(0xD55C)); // 한
+	EXPECT_EQ(u32[1], char32_t(0xAD6D)); // 국
+	EXPECT_EQ(u32[2], char32_t(0xC5B4)); // 어
+	EXPECT_EQ(u32[3], char32_t(0x0020)); // ' '
+	EXPECT_EQ(u32[4], char32_t(0xD14C)); // 테
+	EXPECT_EQ(u32[5], char32_t(0xC2A4)); // 스
+	EXPECT_EQ(u32[6], char32_t(0xD2B8)); // 트
+}
+
+TEST(stringTest, KoreanMercEdtQuote0)
+{
+	const ST::string str = "하하 적군이 왔군!";
+	auto u32 = str.to_utf32();
+	ASSERT_EQ(u32.size(), 10u);
+	EXPECT_EQ(u32[0], char32_t(0xD558)); // 하
+	EXPECT_EQ(u32[1], char32_t(0xD558)); // 하
+	EXPECT_EQ(u32[2], char32_t(0x0020)); // ' '
+	EXPECT_EQ(u32[3], char32_t(0xC801)); // 적
+	EXPECT_EQ(u32[4], char32_t(0xAD60)); // 군
+	EXPECT_EQ(u32[5], char32_t(0xC774)); // 이
+	EXPECT_EQ(u32[6], char32_t(0x0020)); // ' '
+	EXPECT_EQ(u32[7], char32_t(0xC654)); // 왔
+	EXPECT_EQ(u32[8], char32_t(0xAD70)); // 군
+	EXPECT_EQ(u32[9], char32_t(0x0021)); // !
+}
+

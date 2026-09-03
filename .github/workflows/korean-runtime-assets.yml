@@ -1,0 +1,158 @@
+name: Build Korean Runtime Assets
+
+on:
+  push:
+    branches: [korean-localization]
+    paths:
+      - .github/workflows/korean-runtime-assets.yml
+      - tools/korean/build_korean_runtime_assets.py
+      - tools/korean/import_korean_email_edt.py
+      - tools/korean/import_korean_legacy_binarydata.py
+      - tools/korean/generate_korean_sti_fonts.py
+      - tools/korean/generate_korean_titletext.py
+      - tools/korean/ensure_korean_font_symbols.py
+      - tools/korean/validate_edt_layout.py
+      - tools/korean/audit_runtime_assets.py
+      - tools/korean/audit_korean_translation_text.py
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  build_assets:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Stracciatella Korean branch
+        uses: actions/checkout@v4
+        with:
+          ref: korean-localization
+          fetch-depth: 0
+
+      - name: Checkout legacy Korean patch
+        run: git clone --depth 1 https://github.com/munument1/Jagged-Alliance2-korean.git "$RUNNER_TEMP/legacy-ja2-korean"
+
+      - name: Fetch Galmuri7 build font
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/Galmuri-v2.40.4.zip"
+          extract_dir="$RUNNER_TEMP/galmuri-v2.40.4"
+          font_dir="$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/Fonts"
+
+          curl -fL --retry 3 \
+            https://github.com/quiple/galmuri/releases/download/v2.40.4/Galmuri-v2.40.4.zip \
+            -o "$archive"
+          echo 'c8b3d9861a62ae73c8b1178091401cd79994812437ef386413f6dd54856e60e7  '"$archive" | sha256sum -c -
+
+          mkdir -p "$extract_dir"
+          unzip -q "$archive" -d "$extract_dir"
+          src="$(find "$extract_dir" -type f -name 'Galmuri7Bitmap-Regular-2.40.4.ttf' -print -quit)"
+          test -n "$src"
+          cp "$src" "$font_dir/Galmuri7Bitmap-Regular-2.40.4.ttf"
+
+      - name: Install font builder dependency
+        run: python3 -m pip install --user Pillow
+
+      - name: Rebuild Korean STI fonts
+        run: |
+          python3 tools/korean/build_korean_runtime_assets.py \
+            --ttf-dir "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/Fonts"
+
+      - name: Ensure Korean punctuation mappings
+        run: python3 tools/korean/ensure_korean_font_symbols.py
+
+      - name: Generate larger Korean main-menu title text
+        run: |
+          python3 tools/korean/generate_korean_titletext.py \
+            --ttf "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/Fonts/Galmuri14Bitmap-Regular-2.40.4.ttf"
+
+      - name: Import Korean AIM MERC and item text
+        run: |
+          python3 tools/korean/import_korean_legacy_binarydata.py \
+            --legacy-root "$RUNNER_TEMP/legacy-ja2-korean"
+
+      - name: Import vanilla-compatible Korean email data
+        run: |
+          python3 tools/korean/import_korean_email_edt.py \
+            --legacy-root "$RUNNER_TEMP/legacy-ja2-korean"
+
+      - name: Import missing vanilla Korean NPC dialogue
+        shell: bash
+        run: |
+          set -euo pipefail
+          import_npc() {
+            local src="$1" name="$2" expected_src_size="$3" expected_ref_size="$4" label="$5"
+            local ref="assets/mods/simplified-chinese-localization/data/npcdata/$name"
+            local dst="assets/mods/korean-localization/data/NPCData/$name"
+            test -f "$src"; test -f "$ref"
+            local src_size="$(stat -c %s "$src")" ref_size="$(stat -c %s "$ref")"
+            test "$src_size" -eq "$expected_src_size"; test "$ref_size" -eq "$expected_ref_size"
+            test $((src_size % 480)) -eq 0; test $((ref_size % 480)) -eq 0; test "$src_size" -ge "$ref_size"
+            mkdir -p "$(dirname "$dst")"; head -c "$ref_size" "$src" > "$dst"
+            test "$(stat -c %s "$dst")" -eq "$ref_size"
+            echo "Imported $label $name: $((src_size / 480)) legacy records -> $((ref_size / 480)) vanilla records"
+          }
+          import_npc "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/NPCData/097.EDT" 097.EDT 27840 26400 SKYRIDER
+          import_npc "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/NPCData/138.EDT" 138.EDT 13440 10560 WALDO
+          import_npc "$RUNNER_TEMP/legacy-ja2-korean/Patch/Data-1.13/NpcData/159.EDT" 159.EDT 42240 36480 SPECK
+
+      - name: Import Korean main-menu logo
+        shell: bash
+        run: |
+          set -e
+          src="$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/Loadscreens/Ja2Logo.sti"
+          dst="assets/mods/korean-localization/data/Loadscreens/ja2logo.sti"
+          test -f "$src"; test "$(head -c 4 "$src")" = 'STCI'
+          mkdir -p "$(dirname "$dst")"; cp "$src" "$dst"
+          test "$(stat -c %s "$dst")" -eq 22505
+
+      - name: Validate generated localization assets
+        run: |
+          python3 tools/korean/apply_korean_font_aliases.py --check
+          python3 tools/korean/ensure_korean_font_symbols.py --check
+          python3 tools/korean/validate_localization_strings.py
+          python3 tools/korean/validate_edt_layout.py
+          python3 tools/korean/audit_runtime_assets.py
+          python3 tools/korean/audit_korean_translation_text.py
+          python3 tools/korean/audit_edt_text.py --fail-on-suspicious
+          git diff --check
+
+      - name: Commit generated runtime assets
+        shell: bash
+        run: |
+          git add \
+            assets/mods/korean-localization/data/Fonts \
+            assets/mods/korean-localization/data/BinaryData/AIMBIOS.EDT \
+            assets/mods/korean-localization/data/BinaryData/BRAYDESC.EDT \
+            assets/mods/korean-localization/data/BinaryData/EMAIL.EDT \
+            assets/mods/korean-localization/data/BinaryData/ITEMDESC.EDT \
+            assets/mods/korean-localization/data/BinaryData/MERCBIOS.EDT \
+            assets/mods/korean-localization/data/NPCData/097.EDT \
+            assets/mods/korean-localization/data/NPCData/138.EDT \
+            assets/mods/korean-localization/data/NPCData/159.EDT \
+            assets/mods/korean-localization/data/Loadscreens/ja2logo.sti \
+            assets/mods/korean-localization/data/Loadscreens/titletext.sti \
+            assets/externalized/translation_tables/translation-table-kor.json
+          if git diff --cached --quiet; then
+            echo 'No generated Korean runtime asset changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(korean): rebuild complete runtime localization assets'
+          git fetch origin korean-localization
+          git rebase origin/korean-localization
+          git push origin HEAD:korean-localization
+
+      - name: Dispatch Korean asset test package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run korean-asset-package.yml --ref korean-localization
+
+      - name: Explain next test path
+        run: |
+          echo 'Runtime assets are complete.'
+          echo 'Do not start a full Windows compile for asset-only changes.'
+          echo 'Korean Asset Test Package was explicitly dispatched.'

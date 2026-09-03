@@ -77,6 +77,9 @@ bool isRussianGoldVersion();
 /** Check if this is Chinese version of the game. */
 bool isChineseVersion();
 
+/** Check if this is Korean version of the game. */
+bool isKoreanVersion();
+
 /** Get major map version. */
 FLOAT getMajorMapVersion();
 

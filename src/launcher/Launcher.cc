@@ -38,7 +38,8 @@ const std::vector<GameVersion> predefinedVersions = {
 	GameVersion::POLISH,
 	GameVersion::RUSSIAN,
 	GameVersion::RUSSIAN_GOLD,
-	GameVersion::SIMPLIFIED_CHINESE
+	GameVersion::SIMPLIFIED_CHINESE,
+	GameVersion::KOREAN
 };
 const std::vector< std::pair<int, int> > predefinedResolutions = {
 	std::make_pair(640,  480),
@@ -380,7 +381,7 @@ void Launcher::startExecutable(bool asEditor) {
 	// check minimal resolution:
 	if (resolutionIsInvalid()) {
 		fl_message_title("Invalid resolution");
-		fl_alert("Invalid custom resolution %dx%d.\nJA2 Stracciatella needs a resolution of at least 640x480.",
+		fl_alert("Invalid custom resolution %dx%d.\nJA2 Stracciatella needs a resolution of at least 640x480.\n",
 			(int) resolutionXInput->value(),
 			(int) resolutionYInput->value());
 		return;
@@ -819,7 +820,7 @@ void Launcher::selectGameVersion(Fl_Widget* widget, void* userdata)
 	GameVersion currentResourceVersion = predefinedVersions.at(currentResourceVersionIndex);
 	if (currentResourceVersion == GameVersion::SIMPLIFIED_CHINESE)
 	{
-		//force enable Simplified Chinese Mod
+		// force enable Simplified Chinese localization mod
 		for (auto i = window->availableModsBrowser->size(); i > 0; i--)
 		{
 			char* modId = static_cast<char*>(window->availableModsBrowser->data(i));
@@ -829,11 +830,32 @@ void Launcher::selectGameVersion(Fl_Widget* widget, void* userdata)
 	}
 	else
 	{
-		//force diable Simplified Chinese Mod
+		// force disable Simplified Chinese localization mod
 		for (auto i = window->enabledModsBrowser->size(); i > 0; i--)
 		{
 			char* modId = static_cast<char*>(window->enabledModsBrowser->data(i));
 			window->enabledModsBrowser->select(i, strcmp(modId, SIMPLIFIED_CHINESE_MOD_NAME) == 0 ? 1 : 0);
+		}
+		disableMods(window->disableModsButton, userdata);
+	}
+
+	if (currentResourceVersion == GameVersion::KOREAN)
+	{
+		// force enable Korean localization mod
+		for (auto i = window->availableModsBrowser->size(); i > 0; i--)
+		{
+			char* modId = static_cast<char*>(window->availableModsBrowser->data(i));
+			window->availableModsBrowser->select(i, strcmp(modId, KOREAN_MOD_NAME) == 0 ? 1 : 0);
+		}
+		enableMods(window->enableModsButton, userdata);
+	}
+	else
+	{
+		// force disable Korean localization mod
+		for (auto i = window->enabledModsBrowser->size(); i > 0; i--)
+		{
+			char* modId = static_cast<char*>(window->enabledModsBrowser->data(i));
+			window->enabledModsBrowser->select(i, strcmp(modId, KOREAN_MOD_NAME) == 0 ? 1 : 0);
 		}
 		disableMods(window->disableModsButton, userdata);
 	}

@@ -1,0 +1,85 @@
+name: Korean Windows Test Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [korean-localization]
+    paths:
+      - .github/workflows/korean-test-build.yml
+      - src/**
+      - rust/**
+      - .ci/**
+      - cmake/**
+      - CMakeLists.txt
+      - Cargo.toml
+      - Cargo.lock
+      - min-rust-version
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: korean-localization
+
+      - name: Validate Korean localization strings
+        run: python3 tools/korean/validate_localization_strings.py
+      - name: Validate Korean font mappings
+        run: |
+          python3 tools/korean/apply_korean_font_aliases.py --check
+          python3 tools/korean/ensure_korean_font_symbols.py --check
+      - name: Validate Korean runtime assets
+        run: |
+          python3 tools/korean/audit_runtime_assets.py
+          python3 tools/korean/audit_korean_translation_text.py
+          python3 tools/korean/audit_edt_text.py --fail-on-suspicious
+      - name: Verify Korean runtime suffix
+        run: |
+          grep -F 'case VanillaVersion::KOREAN:       return "-kor";' src/externalized/strings/Localization.cc
+      - name: Set up mingw64 environment
+        env:
+          CI_TARGET: linux-mingw64
+          TARGET_GCC_MAJOR_VERSION: 10
+        run: |
+          . "$GITHUB_WORKSPACE/.ci/ci-setup.sh" 2>&1
+          echo "PATH=$PATH" >> "$GITHUB_ENV"
+      - name: Build and test
+        env:
+          CI_NAME: Korean-Windows-Test
+          CI_OS: ubuntu-24.04
+          CI_TARGET: linux-mingw64
+          CI_REF: ${{ github.ref }}
+          GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          "$GITHUB_WORKSPACE/.ci/ci-build.sh" 2>&1
+      - name: Validate Korean EDT
+        run: python tools/korean/validate_edt_layout.py
+      - name: Assemble bundle
+        run: |
+          set -e
+          mkdir -p test-bundle/build-packages
+          cp ci-build/ja2-stracciatella_* test-bundle/build-packages/
+          cp -a assets/mods/korean-localization test-bundle/korean-localization-mod
+          printf '%s\n' \
+            'JA2-Stracciatella Korean localization Windows source test build' \
+            "Commit: $GITHUB_SHA" \
+            '' \
+            'Use this workflow only when engine/build source changes or when a fresh executable baseline is explicitly required.' \
+            'Asset-only Korean changes should use the Korean Asset Test Package workflow instead.' \
+            'Korean externalized strings are enabled via the -kor localization suffix.' \
+            'Small Korean UI fonts are generated from Galmuri9; the baked main-menu labels use Galmuri14.' \
+            'U+00B7 middle dot has a validated Korean runtime font mapping.' \
+            'Check main-menu label size, AIM biographies/additional info/equipment, MERC biographies, IMP, Bobby Ray and item descriptions.' \
+            > test-bundle/TEST_BUILD_INFO.txt
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: JA2-Stracciatella-Korean-Windows-Test
+          path: test-bundle
+          if-no-files-found: error
+          retention-days: 14

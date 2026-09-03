@@ -17,6 +17,7 @@ char const * GetSuffix(VanillaVersion const version, bool const combineRusAndRus
 	case VanillaVersion::SIMPLIFIED_CHINESE: return "-chs";
 	case VanillaVersion::DUTCH:        return "-dut";
 	case VanillaVersion::ENGLISH:      return "-eng";
+	case VanillaVersion::KOREAN:       return "-kor";
 	case VanillaVersion::FRENCH:       return "-fr";
 	case VanillaVersion::GERMAN:       return "-ger";
 	case VanillaVersion::ITALIAN:      return "-it";

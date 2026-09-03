@@ -424,5 +424,6 @@ mod tests {
         t!(VanillaVersion::RUSSIAN, "Russian");
         t!(VanillaVersion::RUSSIAN_GOLD, "Russian (Gold)");
         t!(VanillaVersion::SIMPLIFIED_CHINESE, "Simplified Chinese");
+        t!(VanillaVersion::KOREAN, "Korean");
     }
 }
