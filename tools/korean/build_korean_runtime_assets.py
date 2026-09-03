@@ -17,7 +17,9 @@ import generate_korean_sti_fonts as fonts  # noqa: E402
 
 
 GALMURI9_FONT_FILES = {
+    "BLOCKFONT2.STI",
     "CLOCKFONT.STI",
+    "COMPFONT.STI",
     "FONT10ARIAL.STI",
     "FONT10ARIALBOLD.STI",
     "FONT10ROMAN.STI",
