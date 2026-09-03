@@ -32,6 +32,25 @@ jobs:
       - name: Checkout legacy Korean patch
         run: git clone --depth 1 https://github.com/munument1/Jagged-Alliance2-korean.git "$RUNNER_TEMP/legacy-ja2-korean"
 
+      - name: Fetch Galmuri7 build font
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/Galmuri-v2.40.4.zip"
+          extract_dir="$RUNNER_TEMP/galmuri-v2.40.4"
+          font_dir="$RUNNER_TEMP/legacy-ja2-korean/Patch/Data/Fonts"
+
+          curl -fL --retry 3 \
+            https://github.com/quiple/galmuri/releases/download/v2.40.4/Galmuri-v2.40.4.zip \
+            -o "$archive"
+          echo 'c8b3d9861a62ae73c8b1178091401cd79994812437ef386413f6dd54856e60e7  '"$archive" | sha256sum -c -
+
+          mkdir -p "$extract_dir"
+          unzip -q "$archive" -d "$extract_dir"
+          src="$(find "$extract_dir" -type f -name 'Galmuri7Bitmap-Regular-2.40.4.ttf' -print -quit)"
+          test -n "$src"
+          cp "$src" "$font_dir/Galmuri7Bitmap-Regular-2.40.4.ttf"
+
       - name: Install font builder dependency
         run: python3 -m pip install --user Pillow
 
