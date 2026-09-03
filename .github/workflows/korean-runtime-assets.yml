@@ -17,6 +17,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write
   contents: write
 
 jobs:
@@ -145,8 +146,13 @@ jobs:
           git rebase origin/korean-localization
           git push origin HEAD:korean-localization
 
+      - name: Dispatch Korean asset test package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run korean-asset-package.yml --ref korean-localization
+
       - name: Explain next test path
         run: |
           echo 'Runtime assets are complete.'
           echo 'Do not start a full Windows compile for asset-only changes.'
-          echo 'The generated asset commit will trigger Korean Asset Test Package when files changed.'
+          echo 'Korean Asset Test Package was explicitly dispatched.'
