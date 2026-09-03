@@ -1,0 +1,23 @@
+name: Promote Korean v0.1.0-alpha.2 Release
+
+on:
+  push:
+    branches: [korean-localization]
+    paths:
+      - .github/workflows/promote-korean-v0.1.0-alpha.2.yml
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Promote prerelease to normal release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v0.1.0-alpha.2
+        run: |
+          set -euo pipefail
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease=false --latest
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json tagName,name,isDraft,isPrerelease,url
