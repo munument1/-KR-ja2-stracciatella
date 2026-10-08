@@ -32,8 +32,6 @@ struct ClipInfo
 	ClipInfo(SGPVObject const * hSrcVObject, INT32 iX, INT32 iY, UINT16 usIndex, SGPRect const * clipregion);
 };
 
-bool BltIsClipped(SGPVObject const * hSrcVObject, INT32 iX, INT32 iY, UINT16 usIndex, SGPRect const * clipregion);
-
 
 /* Allocate and initialize a Z-buffer for use with the Z-buffer blitters.
  * Doesn't really do much except allocate a chunk of memory, and zero it. */
@@ -77,14 +75,9 @@ void Blt16BPPTo16BPP(UINT16 *pDest, UINT32 uiDestPitch, UINT16 *pSrc, UINT32 uiS
 void Blt16BPPBufferHatchRect(UINT16 *pBuffer, UINT32 uiDestPitchBYTES, SGPRect *area );
 void Blt16BPPBufferLooseHatchRectWithColor(UINT16 *pBuffer, UINT32 uiDestPitchBYTES, SGPRect *area, UINT16 usColor );
 
-/* Filter a rectangular area with the given filter table.  This is used for
- * shading. */
-void Blt16BPPBufferFilterRect(UINT16* pBuffer, UINT32 uiDestPitchBYTES, const UINT16* filter_table, SGPRect* area);
-
 void Blt8BPPDataTo16BPPBufferShadow( UINT16 *pBuffer, UINT32 uiDestPitchBYTES, HVOBJECT hSrcVObject, INT32 iX, INT32 iY, UINT16 usIndex );
 
 void Blt8BPPDataTo16BPPBuffer( UINT16 *pBuffer, UINT32 uiDestPitchBYTES, SGPVSurface* hSrcVSurface, UINT8 *pSrcBuffer, INT32 iX, INT32 iY);
-void Blt8BPPDataSubTo16BPPBuffer(UINT16* buf, UINT32 uiDestPitchBYTES, SGPVSurface* hSrcVSurface, UINT8* pSrcBuffer, UINT32 src_pitch, INT32 iX, INT32 iY, SGPBox const* rect);
 
 // Blits from flat 8bpp source, to 16bpp dest, divides in half
 void Blt8BPPDataTo16BPPBufferHalf(UINT16* dst_buf, UINT32 uiDestPitchBYTES, SGPVSurface* src_surface, UINT8 const* src_buf, UINT32 src_pitch, INT32 x, INT32 y, SGPBox const* rect);
@@ -94,8 +87,7 @@ void Blt8BPPDataTo16BPPBufferHalf(UINT16* dst_buf, UINT32 uiDestPitchBYTES, SGPV
 void Blt8BPPDataTo16BPPBufferOutline(    UINT16* buf, UINT32 uiDestPitchBYTES, SGPVObject const* hSrcVObject, INT32 iX, INT32 iY, UINT16 usIndex, INT16 outline);
 void BltOutline(ClipInfo const& ci, UINT16* pBuffer, UINT32 uiDestPitchBYTES, INT16 s16BPPColor);
 void Blt8BPPDataTo16BPPBufferOutlineZ(                    UINT16* pBuffer, UINT32 uiDestPitchBYTES, UINT16* pZBuffer, UINT16 usZValue, HVOBJECT hSrcVObject, INT32 iX, INT32 iY, UINT16 usIndex, INT16 s16BPPColor);
-void Blt8BPPDataTo16BPPBufferOutlineShadow(UINT16* pBuffer, UINT32 uiDestPitchBYTES, const SGPVObject* hSrcVObject, INT32 iX, INT32 iY, UINT16 usIndex);
-void Blt8BPPDataTo16BPPBufferOutlineShadowClip( UINT16 *pBuffer, UINT32 uiDestPitchBYTES, const SGPVObject* hSrcVObject, INT32 iX, INT32 iY, UINT16 usIndex, const SGPRect* clipregion);
+void BltOutlineShadow(ClipInfo const& ci, UINT16* pBuffer, UINT32 uiDestPitchBYTES);
 void Blt8BPPDataTo16BPPBufferOutlineZNB(                  UINT16* pBuffer, UINT32 uiDestPitchBYTES, UINT16* pZBuffer, UINT16 usZValue, HVOBJECT hSrcVObject, INT32 iX, INT32 iY, UINT16 usIndex);
 void Blt8BPPDataTo16BPPBufferOutlineZPixelateObscured(    UINT16* pBuffer, UINT32 uiDestPitchBYTES, UINT16* pZBuffer, UINT16 usZValue, HVOBJECT hSrcVObject, INT32 iX, INT32 iY, UINT16 usIndex, INT16 s16BPPColor);
 void BltOutlineZPixelateObscured(ClipInfo const& ci, UINT16 *pBuffer, UINT32 uiDestPitchBytes, UINT16* pZBuffer, UINT16 usZValue, INT16 s16BPPColor);

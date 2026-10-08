@@ -1234,7 +1234,8 @@ static void CheckIfNearbyGroundSeemsWrong(SOLDIERTYPE* const s, UINT16 const gri
 		EVENT_StopMerc(s);
 		*keep_moving = FALSE;
 
-		gpWorldLevelData[mine_gridno].uiFlags |= MAPELEMENT_ENEMY_MINE_PRESENT;
+		gpWorldLevelData[mine_gridno].uiFlags |= s->bSide == Side::FRIENDLY ?
+			MAPELEMENT_PLAYER_MINE_PRESENT : MAPELEMENT_ENEMY_MINE_PRESENT;
 
 		// Better stop and reconsider what to do
 		SetNewSituation(s);
@@ -4455,6 +4456,8 @@ BOOLEAN CheckForEndOfBattle( BOOLEAN fAnEnemyRetreated )
 		// battle for us
 		EndAllAITurns( );
 
+		ClearAIExposedTileMap();
+
 		// Set enemy presence to false
 		// This is safe 'cause we're about to unload the friggen sector anyway....
 		gTacticalStatus.fEnemyInSector = FALSE;
@@ -4523,6 +4526,8 @@ BOOLEAN CheckForEndOfBattle( BOOLEAN fAnEnemyRetreated )
 		// CJC: End AI's turn here.... first... so that UnSetUIBusy will succeed if militia win
 		// battle for us
 		EndAllAITurns( );
+
+		ClearAIExposedTileMap();
 
 		UnSetUIBusy(GetSelectedMan());
 
@@ -5317,6 +5322,9 @@ static void HandleSuppressionFire(const SOLDIERTYPE* const targeted_merc, SOLDIE
 					pSoldier->usActionData = ubNewStance;
 					pSoldier->bActionInProgress = TRUE;
 				}
+
+				// Stop first aid, or they'd get back up into the aid crouch
+				InternalGivingSoldierCancelServices( pSoldier, FALSE );
 
 				// go for it!
 				// ATE: Cancel any PENDING ANIMATIONS...

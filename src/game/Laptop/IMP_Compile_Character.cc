@@ -4,6 +4,8 @@
 #include "GamePolicy.h"
 #include "IMPPolicy.h"
 #include "ContentManager.h"
+#include "MercProfileInfo.h"
+#include "Soldier_Control.h"
 #include "IMP_Portraits.h"
 #include "IMP_SkillTraits.h"
 #include "IMP_Compile_Character.h"
@@ -15,6 +17,9 @@
 
 
 #define ATTITUDE_LIST_SIZE 20
+
+// the strength a burly portrait has to be carried by to become a burly body
+#define IMP_BIG_BODY_MIN_STRENGTH 75
 
 
 static INT32 AttitudeList[ATTITUDE_LIST_SIZE];
@@ -29,14 +34,181 @@ static INT32 iLastElementInPersonalityList = 0;
 static void SelectMercFace(void);
 
 
+/* An I.M.P. slot is a profile a player generated character can be made in, and
+ * that is any profile the data leaves undeclared. A declaration is what claims
+ * a profile -- 164 is declared because it stands in for the vehicles that go
+ * unused, every named character is declared because it is somebody -- so what
+ * no entry names is by that fact spare, whether it sits among the profiles the
+ * original game shipped or in the range past them that the game only just
+ * gained. The shipped data now declares no I.M.P. slot at all: the six the
+ * original game kept at 51 to 56 are simply left out, and the site finds them
+ * the same way it finds the rest.
+ *
+ * So raising max_characters is enough on its own, with no mod installed and
+ * nothing else to edit, and a mod that wants one of these profiles for
+ * something else takes it by declaring it, whatever it declares it as.
+ *
+ * A profile a mod declares as an I.M.P. slot counts as well, for the mods that
+ * already say so and because the type means exactly this. */
+static bool IsIMPSlot(ProfileID const profile)
+{
+	MercProfileInfo const& info = *GCM->getMercProfileInfo(profile);
+	return info.profileID == NO_PROFILE || info.mercType == MercType::IMP;
+}
+
+
+UINT8 GetNumberOfIMPSlots(void)
+{
+	UINT8 ubSlots = 0;
+	for (ProfileID profile = 0; profile < NUM_PROFILES; ++profile)
+	{
+		if (IsIMPSlot(profile)) ++ubSlots;
+	}
+	return ubSlots;
+}
+
+
+UINT8 GetNumberOfIMPCharactersCreated(void)
+{
+	UINT8 ubCreated = 0;
+	for (ProfileID profile = 0; profile < NUM_PROFILES; ++profile)
+	{
+		if (IsIMPSlot(profile) && gMercProfiles[profile].impSlotState == IMPSlotState::TAKEN) ++ubCreated;
+	}
+	return ubCreated;
+}
+
+
+ProfileID GetIMPSlotInProgress(void)
+{
+	// The set of taken slots does not change while a character is being built,
+	// so the first free one stays the same one across the whole process and
+	// over a save and load in the middle of it.
+	for (ProfileID profile = 0; profile < NUM_PROFILES; ++profile)
+	{
+		if (IsIMPSlot(profile) && gMercProfiles[profile].impSlotState == IMPSlotState::FREE) return profile;
+	}
+	return NO_PROFILE;
+}
+
+
+bool CanCreateAnotherIMPCharacter(void)
+{
+	if (GetIMPSlotInProgress() == NO_PROFILE) return false;
+	return GetNumberOfIMPCharactersCreated() < gamepolicy(imp_max_characters);
+}
+
+
+void MarkIMPCharacterCreated(ProfileID const profile)
+{
+	gMercProfiles[profile].impSlotState = IMPSlotState::TAKEN;
+	LaptopSaveInfo.fIMPCompletedFlag = TRUE;
+}
+
+
+const std::vector<IMPVoice>& GetIMPVoices(void)
+{
+	return GCM->getIMPPolicy()->getVoices();
+}
+
+
+const std::vector<IMPPortrait>& GetIMPPortraits(void)
+{
+	return GCM->getIMPPolicy()->getPortraits();
+}
+
+
+template<typename T> static INT32 CountForGender(std::vector<T> const& entries, bool const fMale)
+{
+	INT32 iCount = 0;
+	for (T const& entry : entries)
+	{
+		if (entry.isMale == fMale) ++iCount;
+	}
+	return iCount;
+}
+
+
+template<typename T> static INT32 IndexForGender(std::vector<T> const& entries, bool const fMale, INT32 const iNth)
+{
+	INT32 iSeen = 0;
+	for (size_t i = 0; i != entries.size(); ++i)
+	{
+		if (entries[i].isMale != fMale) continue;
+		if (iSeen++ == iNth) return static_cast<INT32>(i);
+	}
+	return -1;
+}
+
+
+INT32 GetNumberOfIMPVoices(bool const fMale)
+{
+	return CountForGender(GetIMPVoices(), fMale);
+}
+
+
+INT32 GetNumberOfIMPPortraits(bool const fMale)
+{
+	return CountForGender(GetIMPPortraits(), fMale);
+}
+
+
+INT32 GetIMPVoiceIndex(bool const fMale, INT32 const iNth)
+{
+	return IndexForGender(GetIMPVoices(), fMale, iNth);
+}
+
+
+INT32 GetIMPPortraitIndex(bool const fMale, INT32 const iNth)
+{
+	return IndexForGender(GetIMPPortraits(), fMale, iNth);
+}
+
+
+IMPPortrait const& GetCurrentIMPPortrait(void)
+{
+	std::vector<IMPPortrait> const& portraits = GetIMPPortraits();
+	Assert(iPortraitNumber >= 0 && iPortraitNumber < static_cast<INT32>(portraits.size()));
+	return portraits[iPortraitNumber];
+}
+
+
+bool IMPCharacterHasBigBody(MERCPROFILESTRUCT const& p)
+{
+	if (p.bSex != MALE) return false;
+
+	INT32 const iPortrait = FindIMPPortraitByFace(p.ubFaceIndex);
+	if (iPortrait < 0 || !GetIMPPortraits()[iPortrait].bigBody) return false;
+
+	// the strength the character was made with, which is what the build was
+	// decided on: training up afterwards does not change anyone's shape
+	return p.bStrength - p.bStrengthDelta >= IMP_BIG_BODY_MIN_STRENGTH;
+}
+
+
+INT32 FindIMPPortraitByFace(UINT8 const ubFaceIndex)
+{
+	std::vector<IMPPortrait> const& portraits = GetIMPPortraits();
+	for (size_t i = 0; i != portraits.size(); ++i)
+	{
+		if (portraits[i].face == ubFaceIndex) return static_cast<INT32>(i);
+	}
+	return -1;
+}
+
+
 void CreateACharacterFromPlayerEnteredStats(void)
 {
-	MERCPROFILESTRUCT& p = GetProfile(PLAYER_GENERATED_CHARACTER_ID + LaptopSaveInfo.iVoiceId);
+	MERCPROFILESTRUCT& p = GetProfile(GetIMPSlotInProgress());
 
 	p.zName = pFullName;
 	p.zNickname = pNickName;
 
 	p.bSex = fCharacterIsMale ? MALE : FEMALE;
+
+	// The voice the player picked, which is where this character's speech,
+	// dialogue text and battle sounds come from.
+	p.ubVoiceId = GetIMPVoices()[LaptopSaveInfo.iVoiceId].profile;
 
 	p.bLifeMax    = iHealth;
 	p.bLife       = iHealth;
@@ -57,8 +229,10 @@ void CreateACharacterFromPlayerEnteredStats(void)
 
 	p.bExpLevel = GCM->getIMPPolicy()->getStartingLevel();
 
-	// set time away
-	p.bMercStatus = 0;
+	// Clears MERC_HAS_NO_TEXT_FILE, which loading the profiles stamps on every
+	// slot with no dialogue file named after it. That is all of them past the six
+	// the game shipped with, until the voice picked above lends them one.
+	p.bMercStatus = MERC_OK;
 
 	SelectMercFace();
 }
@@ -164,7 +338,7 @@ static void ValidateSkillsList(void)
 {
 	// remove from the generated traits list any traits that don't match
 	// the character's skills
-	MERCPROFILESTRUCT& p = GetProfile(PLAYER_GENERATED_CHARACTER_ID + LaptopSaveInfo.iVoiceId);
+	MERCPROFILESTRUCT& p = GetProfile(GetIMPSlotInProgress());
 
 	if (p.bMechanical == 0)
 	{
@@ -330,10 +504,10 @@ static void SetMercSkinAndHairColors(void);
 static void SelectMercFace(void)
 {
 	// this procedure will select the approriate face for the merc and save offsets
-	MERCPROFILESTRUCT& p = GetProfile(PLAYER_GENERATED_CHARACTER_ID + LaptopSaveInfo.iVoiceId);
+	MERCPROFILESTRUCT& p = GetProfile(GetIMPSlotInProgress());
 
 	// now the offsets
-	p.ubFaceIndex = 200 + iPortraitNumber;
+	p.ubFaceIndex = GetCurrentIMPPortrait().face;
 
 	// eyes
 	p.usEyesX = 0;
@@ -350,49 +524,13 @@ static void SelectMercFace(void)
 
 static void SetMercSkinAndHairColors(void)
 {
-#define PINKSKIN  "PINKSKIN"
-#define TANSKIN   "TANSKIN"
-#define DARKSKIN  "DARKSKIN"
-#define BLACKSKIN "BLACKSKIN"
-
-#define BROWNHEAD "BROWNHEAD"
-#define BLACKHEAD "BLACKHEAD" // black skin till here
-#define WHITEHEAD "WHITEHEAD" // dark skin till here
-#define BLONDHEAD "BLONDHEAD"
-#define REDHEAD   "REDHEAD"   // pink/tan skin till here
-
-	static const struct
-	{
-		const char* Skin;
-		const char* Hair;
-	} Colors[] =
-	{
-		{ BLACKSKIN, BROWNHEAD },
-		{ TANSKIN,   BROWNHEAD },
-		{ TANSKIN,   BROWNHEAD },
-		{ DARKSKIN,  BROWNHEAD },
-		{ TANSKIN,   BROWNHEAD },
-		{ DARKSKIN,  BLACKHEAD },
-		{ TANSKIN,   BROWNHEAD },
-		{ TANSKIN,   BROWNHEAD },
-		{ TANSKIN,   BROWNHEAD },
-		{ PINKSKIN,  BROWNHEAD },
-		{ TANSKIN,   BLACKHEAD },
-		{ TANSKIN,   BLACKHEAD },
-		{ PINKSKIN,  BROWNHEAD },
-		{ BLACKSKIN, BROWNHEAD },
-		{ TANSKIN,   REDHEAD   },
-		{ TANSKIN,   BLONDHEAD }
-	};
-
-	Assert(iPortraitNumber < static_cast<INT32>(lengthof(Colors)));
-	MERCPROFILESTRUCT& p = GetProfile(PLAYER_GENERATED_CHARACTER_ID + LaptopSaveInfo.iVoiceId);
-	p.HAIR = Colors[iPortraitNumber].Hair;
-	p.SKIN = Colors[iPortraitNumber].Skin;
+	IMPPortrait const& portrait = GetCurrentIMPPortrait();
+	MERCPROFILESTRUCT& p = GetProfile(GetIMPSlotInProgress());
+	p.HAIR = portrait.hair;
+	p.SKIN = portrait.skin;
 }
 
 
-static BOOLEAN ShouldThisMercHaveABigBody(void);
 
 
 void HandleMercStatsForChangesInFace(void)
@@ -401,12 +539,12 @@ void HandleMercStatsForChangesInFace(void)
 
 	CreatePlayerSkills();
 
-	MERCPROFILESTRUCT& p = GetProfile(PLAYER_GENERATED_CHARACTER_ID + LaptopSaveInfo.iVoiceId);
+	MERCPROFILESTRUCT& p = GetProfile(GetIMPSlotInProgress());
 
 	// body type
 	if (fCharacterIsMale)
 	{
-		if (ShouldThisMercHaveABigBody())
+		if (IMPCharacterHasBigBody(p))
 		{
 			p.ubBodyType = BIGMALE;
 			if (iSkillA == MARTIALARTS) iSkillA = HANDTOHAND;
@@ -430,10 +568,92 @@ void HandleMercStatsForChangesInFace(void)
 }
 
 
-static BOOLEAN ShouldThisMercHaveABigBody(void)
+#ifdef WITH_UNITTESTS
+#include "DefaultContentManagerUT.h"
+#include "MercProfile.h"
+#include "gtest/gtest.h"
+
+using IMPSlotTest = DefaultContentManagerUT::BaseTest;
+
+/* What the shipped data leaves free, in the order the site hands it out. The
+ * six the original game kept for player generated characters come first, then
+ * the ones nobody ever filled in, then the range added past the profiles the
+ * original game shipped. 164 is not among them although nothing is recorded
+ * for it either: it is declared, because the unused vehicles stand on it. */
+TEST_F(IMPSlotTest, theFreeProfilesAreTheUndeclaredOnes)
 {
-	// should this merc be a big body typ
-	return
-		(iPortraitNumber == 0 || iPortraitNumber == 6 || iPortraitNumber == 7) &&
-		gMercProfiles[PLAYER_GENERATED_CHARACTER_ID + LaptopSaveInfo.iVoiceId].bStrength >= 75;
+	for (ProfileID i = 0; i != NUM_PROFILES; ++i)
+	{
+		gMercProfiles[i].impSlotState = IMPSlotState::FREE;
+	}
+
+	std::vector<ProfileID> handedOut;
+	for (ProfileID slot; (slot = GetIMPSlotInProgress()) != NO_PROFILE; )
+	{
+		handedOut.push_back(slot);
+		gMercProfiles[slot].impSlotState = IMPSlotState::TAKEN;
+	}
+
+	std::vector<ProfileID> expected{ 51, 52, 53, 54, 55, 56, 165, 166, 167, 168, 169 };
+	for (ProfileID i = NUM_VANILLA_PROFILES; i != NUM_PROFILES; ++i) expected.push_back(i);
+
+	EXPECT_EQ(handedOut, expected);
+	EXPECT_EQ(GetNumberOfIMPSlots(), expected.size());
+	EXPECT_EQ(GetNumberOfIMPCharactersCreated(), expected.size());
+
+	for (ProfileID i = 0; i != NUM_PROFILES; ++i)
+	{
+		gMercProfiles[i].impSlotState = IMPSlotState::FREE;
+	}
 }
+
+
+/* A character made in a free slot is a whole character, although the content
+ * had nothing to say about the profile it went into. The voice in particular:
+ * it is the one the player picked, not the slot's own number, which is what
+ * lets any profile hold a character at all. */
+TEST_F(IMPSlotTest, aCharacterMadeInAFreeSlotCarriesWhatItWasGiven)
+{
+	for (ProfileID i = 0; i != NUM_PROFILES; ++i)
+	{
+		gMercProfiles[i].impSlotState = IMPSlotState::FREE;
+	}
+
+	ProfileID const slot = GetIMPSlotInProgress();
+	ASSERT_EQ(slot, 51);
+	MERCPROFILESTRUCT const untouched = gMercProfiles[slot];
+
+	// the third female voice, so that a wrong answer cannot look right by
+	// happening to match the slot the character is made in
+	fCharacterIsMale = FALSE;
+	LaptopSaveInfo.iVoiceId = 5;
+	pFullName = "Testy McTestface";
+	pNickName = "Testy";
+	iHealth = iAgility = iStrength = iDexterity = iWisdom = iLeadership = 55;
+	iMarksmanship = iMedical = iMechanical = iExplosives = 55;
+	iSkillA = iSkillB = 0;
+	iPersonality = iAttitude = 0;
+
+	CreateACharacterFromPlayerEnteredStats();
+	MarkIMPCharacterCreated(slot);
+
+	MERCPROFILESTRUCT const& p = gMercProfiles[slot];
+	EXPECT_EQ(p.ubVoiceId, GetIMPVoices()[5].profile);
+	EXPECT_EQ(p.zNickname, "Testy");
+	EXPECT_EQ(p.bSex, FEMALE);
+	EXPECT_EQ(p.bMercStatus, MERC_OK);
+
+	// and the character is one of the player's own, in a profile that says
+	// nothing about itself
+	EXPECT_TRUE(MercProfile(slot).isIMPMerc());
+	EXPECT_TRUE(MercProfile(slot).isPlayerMerc());
+	EXPECT_EQ(GetIMPSlotInProgress(), 52);
+
+	gMercProfiles[slot] = untouched;
+	for (ProfileID i = 0; i != NUM_PROFILES; ++i)
+	{
+		gMercProfiles[i].impSlotState = IMPSlotState::FREE;
+	}
+	LaptopSaveInfo.fIMPCompletedFlag = FALSE;
+}
+#endif

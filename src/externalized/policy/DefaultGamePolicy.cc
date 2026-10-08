@@ -6,7 +6,7 @@ DefaultGamePolicy::DefaultGamePolicy(const JsonValue& json)
 	auto gp = json.toObject();
 	extra_hotkeys = gp.getOptionalBool("extra_hotkeys", true);
 	can_enter_turnbased = gp.getOptionalBool("can_enter_turnbased");
-	middle_mouse_look = gp.getOptionalBool("middle_mouse_look", true);
+	extra_mousewheel_actions = gp.getOptionalBool("extra_mousewheel_actions", true);
 
 	f_draw_item_shadow = gp.getOptionalBool("draw_item_shadow", true);
 	target_fps = gp.getOptionalInt("target_fps", 40);
@@ -33,8 +33,10 @@ DefaultGamePolicy::DefaultGamePolicy(const JsonValue& json)
 	threshold_cth_head = ai.getOptionalInt("threshold_cth_head", 67);
 	threshold_cth_legs = ai.getOptionalInt("threshold_cth_legs", 67);
 
-	avoid_ambushes = ai.getOptionalBool("avoid_ambushes");
+	corpse_warning_duration = ai.getOptionalUInt("corpse_warning_duration", 0);
+	corpse_warning_distance = ai.getOptionalUInt("corpse_warning_distance", 5);
 	stay_on_rooftop = ai.getOptionalBool("stay_on_rooftop");
+	avoid_light_tiles_at_night = ai.getOptionalBool("avoid_light_tiles_at_night");
 
 	interrupt_after_being_under_fire = gp.getOptionalBool("interrupt_after_being_under_fire", true);
 
@@ -72,6 +74,8 @@ DefaultGamePolicy::DefaultGamePolicy(const JsonValue& json)
 	imp_attribute_zero_bonus = imp.getOptionalInt("zero_attribute_points_bonus", 15);
 	imp_attribute_bonus = imp.getOptionalInt("bonus_attribute_points", 40);
 	imp_pick_skills_directly = imp.getOptionalBool("pick_skills_directly");
+
+	imp_max_characters = imp.getOptionalUInt("max_characters", 1);
 
 	merc_online_min_days = gp.getOptionalUInt("merc_online_min_days", 1);
 	merc_online_max_days = gp.getOptionalUInt("merc_online_max_days", 2);
@@ -154,6 +158,14 @@ bool DefaultGamePolicy::isHotkeyEnabled(UIMode mode, HotkeyModifier modifier, ui
 			switch(key)
 			{
 				case 'i':         return extra_hotkeys;
+			}
+		}
+		else if(modifier == HKMOD_SHIFT)
+		{
+			switch(key)
+			{
+				case 'r':
+				case 's':         return extra_hotkeys;
 			}
 		}
 	}

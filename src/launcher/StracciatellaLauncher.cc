@@ -12,7 +12,7 @@ StracciatellaLauncher::StracciatellaLauncher() {
         o->labelcolor((Fl_Color)24);
         { editorButton = new Fl_Button(160, 150, 200, 25, "Start Map Editor");
         } // Fl_Button* editorButton
-        { playButton = new Fl_Button(160, 185, 200, 55, "Play Ja2 Stracciatella");
+        { playButton = new Fl_Button(160, 185, 200, 55, "JA2 Stracciatella 실행");
         } // Fl_Button* playButton
         o->end();
       } // Fl_Group* o

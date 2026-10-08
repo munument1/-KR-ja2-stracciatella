@@ -3,7 +3,7 @@ name: Korean Windows Test Build
 on:
   workflow_dispatch:
   push:
-    branches: [korean-localization]
+    branches: [korean-localization, master]
     paths:
       - .github/workflows/korean-test-build.yml
       - src/**
@@ -25,7 +25,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: korean-localization
+          ref: ${{ github.ref }}
 
       - name: Validate Korean localization strings
         run: python3 tools/korean/validate_localization_strings.py

@@ -42,10 +42,14 @@
 #include <math.h>
 #include <stdexcept>
 
-#define NO_TEST_OBJECT				0
-#define TEST_OBJECT_NO_COLLISIONS		1
-#define TEST_OBJECT_ANY_COLLISION		2
-#define TEST_OBJECT_NOTWALLROOF_COLLISIONS	3
+enum TestObjectCollisions : int8_t
+{
+	NO_TEST_OBJECT = 0,
+	TEST_OBJECT_NO_COLLISIONS = 1,
+	// TEST_OBJECT_ANY_COLLISION was removed, keep the next
+	// enumerator's value of 3 for save game compatibility.
+	TEST_OBJECT_NOTWALLROOF_COLLISIONS = 3
+};
 
 #define OUTDOORS_START_ANGLE			(FLOAT)( PI/4 )
 #define INDOORS_START_ANGLE			(FLOAT)( PI/30 )
@@ -80,26 +84,10 @@ constexpr float EPSILONP = 0.01f;
 #define REALOBJ2ID(o) 				((o) - ObjectSlots)
 
 namespace {
-vector_3 VAdd( vector_3 *a, vector_3 *b )
+constexpr vector_3 operator*(vector_3 lhs, float multiplier)
 {
-	vector_3 c;
-
-	c.x = a->x + b->x;
-	c.y = a->y + b->y;
-	c.z = a->z + b->z;
-
-	return( c );
-}
-
-vector_3 VMultScalar( vector_3 *a, float b )
-{
-	vector_3 c;
-
-	c.x = a->x * b;
-	c.y = a->y * b;
-	c.z = a->z * b;
-
-	return( c );
+	lhs *= multiplier;
+	return lhs;
 }
 
 
@@ -111,23 +99,37 @@ float VDotProduct( vector_3 *a, vector_3 *b )
 
 vector_3 VGetNormal( vector_3 *a )
 {
-	vector_3 c;
 	const float length = VDotProduct(a, a);
 	if (length == 0)
 	{
-		c.x = 0;
-		c.y = 0;
-		c.z = 0;
+		return { 0, 0, 0 };
 	}
-	else
-	{
-		const float OneOverLength = 1 / sqrt(length);
-		c.x = OneOverLength * a->x;
-		c.y = OneOverLength * a->y;
-		c.z = OneOverLength * a->z;
-	}
-	return ( c );
+
+	const float OneOverLength = 1 / sqrt(length);
+	return *a * OneOverLength;
 }
+
+
+enum CollisionEnums
+{
+	COLLISION_NONE,
+	COLLISION_GROUND,
+	COLLISION_MERC,
+	COLLISION_WINDOW_SOUTHEAST,
+	COLLISION_WINDOW_SOUTHWEST,
+	COLLISION_WINDOW_NORTHEAST,
+	COLLISION_WINDOW_NORTHWEST,
+	COLLISION_WINDOW_NORTH,
+	COLLISION_WALL_SOUTHEAST,
+	COLLISION_WALL_SOUTHWEST,
+	COLLISION_WALL_NORTHEAST,
+	COLLISION_WALL_NORTHWEST,
+	COLLISION_STRUCTURE,
+	COLLISION_ROOF,
+	COLLISION_INTERIOR_ROOF,
+	COLLISION_STRUCTURE_Z,
+	COLLISION_WATER
+};
 }
 
 /// OBJECT POOL FUNCTIONS
@@ -205,7 +207,7 @@ REAL_OBJECT* CreatePhysicalObject(OBJECTTYPE const* const pGameObj, float const 
 	o->InitialForce.x          = SCALE_VERT_VAL_TO_HORZ(xForce);
 	o->InitialForce.y          = SCALE_VERT_VAL_TO_HORZ(yForce);
 	o->InitialForce.z          = zForce;
-	o->InitialForce            = VMultScalar(&o->InitialForce, (float)(1.5 / TIME_MULTI));
+	o->InitialForce            *= (float)(1.5 / TIME_MULTI);
 	o->sGridNo                 = vector_3ToGridNo(o->Position);
 	o->pNode                   = 0;
 	o->pShadow                 = 0;
@@ -336,8 +338,6 @@ static void SimulateObject(REAL_OBJECT * const pObject)
 
 static void PhysicsComputeForces(REAL_OBJECT* pObject)
 {
-	vector_3			vTemp;
-
 	// Calculate forces
 	pObject->Force = pObject->InitialForce;
 
@@ -348,8 +348,7 @@ static void PhysicsComputeForces(REAL_OBJECT* pObject)
 
 	if ( pObject->fApplyFriction )
 	{
-		vTemp = VMultScalar( &(pObject->Velocity), -pObject->AppliedMu );
-		pObject->Force = VAdd( &(vTemp), &(pObject->Force) );
+		pObject->Force += pObject->Velocity * -pObject->AppliedMu;
 
 		pObject->fApplyFriction = FALSE;
 	}
@@ -473,14 +472,11 @@ static BOOLEAN PhysicsUpdateLife(REAL_OBJECT* pObject, float DeltaTime)
 
 static void PhysicsIntegrate(REAL_OBJECT * const pObject, float const DeltaTime)
 {
-	vector_3			vTemp;
-
 	// Save old position
 	pObject->OldPosition = pObject->Position;
 	pObject->OldVelocity = pObject->Velocity;
 
-	vTemp = VMultScalar( &(pObject->Velocity), DeltaTime );
-	pObject->Position = VAdd( &(pObject->Position), &vTemp );
+	pObject->Position += pObject->Velocity * DeltaTime;
 
 	// Save test TargetPosition
 	if ( pObject->fTestPositionNotSet )
@@ -488,8 +484,7 @@ static void PhysicsIntegrate(REAL_OBJECT * const pObject, float const DeltaTime)
 		pObject->TestTargetPosition = pObject->Position;
 	}
 
-	vTemp = VMultScalar( &(pObject->Force), ( DeltaTime / 60.0f ) );
-	pObject->Velocity = VAdd( &(pObject->Velocity), &vTemp );
+	pObject->Velocity += pObject->Force * (DeltaTime / 60.0f);
 
 	if ( pObject->fPotentialForDebug )
 	{
@@ -518,6 +513,7 @@ static void PhysicsIntegrate(REAL_OBJECT * const pObject, float const DeltaTime)
 }
 
 
+static CollisionEnums CheckForCollision(FLOAT dX, FLOAT dY, FLOAT dZ, FLOAT dDeltaX, FLOAT dDeltaY, FLOAT dDeltaZ, UINT16* pusStructureID, FLOAT* pdNormalX, FLOAT* pdNormalY, FLOAT* pdNormalZ);
 static BOOLEAN PhysicsCheckForCollisions(REAL_OBJECT* pObject, INT32* piCollisionID);
 static void PhysicsResolveCollision(REAL_OBJECT* pObject, vector_3* pVelocity, vector_3* pNormal, float CoefficientOfRestitution);
 
@@ -700,17 +696,6 @@ static BOOLEAN PhysicsCheckForCollisions(REAL_OBJECT* pObject, INT32* piCollisio
 
 
 	// If a test object and we have collided with something ( should only be ground ( or roof? ) )
-	// Or destination?
-	if ( pObject->fTestObject == TEST_OBJECT_ANY_COLLISION )
-	{
-		if ( iCollisionCode != COLLISION_GROUND && iCollisionCode != COLLISION_ROOF && iCollisionCode != COLLISION_WATER && iCollisionCode != COLLISION_NONE )
-		{
-			pObject->fTestEndedWithCollision = TRUE;
-			pObject->fAlive = FALSE;
-			return( FALSE );
-		}
-	}
-
 	if ( pObject->fTestObject == TEST_OBJECT_NOTWALLROOF_COLLISIONS )
 	{
 		// So we don't collide with ourselves.....
@@ -889,7 +874,6 @@ static BOOLEAN PhysicsCheckForCollisions(REAL_OBJECT* pObject, INT32* piCollisio
 		}
 		else if ( iCollisionCode == COLLISION_WATER )
 		{
-			ANITILE_PARAMS	AniParams;
 			ANITILE						*pNode;
 
 			// Continue going...
@@ -918,7 +902,7 @@ static BOOLEAN PhysicsCheckForCollisions(REAL_OBJECT* pObject, INT32* piCollisio
 					pObject->fInWater = TRUE;
 
 					// Make ripple
-					AniParams = ANITILE_PARAMS{};
+					ANITILE_PARAMS AniParams{};
 					AniParams.sGridNo = sGridNo;
 					AniParams.ubLevelID = ANI_STRUCT_LEVEL;
 					AniParams.usTileIndex = THIRDMISS1;
@@ -1080,17 +1064,9 @@ static BOOLEAN PhysicsCheckForCollisions(REAL_OBJECT* pObject, INT32* piCollisio
 
 static void PhysicsResolveCollision(REAL_OBJECT* pObject, vector_3* pVelocity, vector_3* pNormal, float CoefficientOfRestitution)
 {
-	float ImpulseNumerator, Impulse;
-	vector_3 vTemp;
+	float Impulse = -1 * CoefficientOfRestitution * VDotProduct( pVelocity , pNormal );
 
-	ImpulseNumerator = -1 * CoefficientOfRestitution * VDotProduct( pVelocity , pNormal );
-
-	Impulse = ImpulseNumerator;
-
-	vTemp = VMultScalar( pNormal, Impulse );
-
-	pObject->Velocity = VAdd( &(pObject->Velocity), &vTemp );
-
+	pObject->Velocity += *pNormal * Impulse;
 }
 
 
@@ -1250,7 +1226,7 @@ static BOOLEAN PhysicsMoveObject(REAL_OBJECT* pObject)
 static FLOAT CalculateObjectTrajectory(INT16 sTargetZ, const OBJECTTYPE* pItem, vector_3* vPosition, vector_3* vForce, INT16* psFinalGridNo);
 
 
-static vector_3 FindBestForceForTrajectory(INT16 sSrcGridNo, INT16 sGridNo, INT16 sStartZ, INT16 sEndZ, float dzDegrees, const OBJECTTYPE* pItem, INT16* psGridNo, float* pdMagForce)
+static float FindBestForceForTrajectory(INT16 sSrcGridNo, INT16 sGridNo, INT16 sStartZ, INT16 sEndZ, float dzDegrees, const OBJECTTYPE* pItem, INT16* psGridNo)
 {
 	vector_3 vDirNormal, vPosition, vForce;
 	INT16    sDestX, sDestY, sSrcX, sSrcY;
@@ -1296,9 +1272,7 @@ static vector_3 FindBestForceForTrajectory(INT16 sSrcGridNo, INT16 sGridNo, INT1
 
 
 		// Now use a force
-		vForce.x = dForce * vDirNormal.x;
-		vForce.y = dForce * vDirNormal.y;
-		vForce.z = dForce * vDirNormal.z;
+		vForce = vDirNormal * dForce;
 
 		dTestRange = CalculateObjectTrajectory( sEndZ, pItem, &vPosition, &vForce, psGridNo );
 
@@ -1331,13 +1305,8 @@ static vector_3 FindBestForceForTrajectory(INT16 sSrcGridNo, INT16 sGridNo, INT1
 		//ScreenMsg( FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, L"Chance to get through throw is 0." );
 	}
 
-	if ( pdMagForce )
-	{
-		(*pdMagForce) = dForce;
-	}
 	SLOGD("Number of integration: {}", iNumChecks);
-
-	return( vForce );
+	return dForce;
 }
 
 
@@ -1382,9 +1351,7 @@ static float FindBestAngleForTrajectory(INT16 sSrcGridNo, INT16 sGridNo, INT16 s
 		iNumChecks++;
 
 		// Now use a force
-		vForce.x = dForce * vDirNormal.x;
-		vForce.y = dForce * vDirNormal.y;
-		vForce.z = dForce * vDirNormal.z;
+		vForce = vDirNormal * dForce;
 
 		dTestRange = CalculateObjectTrajectory( sEndZ, pItem, &vPosition, &vForce, psGridNo );
 
@@ -1417,9 +1384,7 @@ static float FindBestAngleForTrajectory(INT16 sSrcGridNo, INT16 sGridNo, INT16 s
 			// From degrees, calculate Z portion of normal
 			vDirNormal.z	= (float)sin( dzDegrees );
 			// Now use a force
-			vForce.x = dForce * vDirNormal.x;
-			vForce.y = dForce * vDirNormal.y;
-			vForce.z = dForce * vDirNormal.z;
+			vForce = vDirNormal * dForce;
 			dTestRange = CalculateObjectTrajectory( sEndZ, pItem, &vPosition, &vForce, psGridNo );
 			return( (FLOAT)( dzDegrees ) );
 		}
@@ -1513,11 +1478,7 @@ static INT32 ChanceToGetThroughObjectTrajectory(INT16 sTargetZ, const OBJECTTYPE
 	PhysicsDeleteObject( pObject );
 
 	// See If we collided
-	if ( pObject->fTestEndedWithCollision )
-	{
-		return( 0 );
-	}
-	return( 100 );
+	return pObject->fTestEndedWithCollision ? 0 : 100;
 }
 
 
@@ -1611,7 +1572,7 @@ static void CalculateLaunchItemBasicParams(const SOLDIERTYPE* pSoldier, const OB
 	}
 
 	// Find force for basic
-	FindBestForceForTrajectory( pSoldier->sGridNo, sGridNo, sStartZ, sEndZ, dDegrees, pItem, psFinalGridNo, &dMagForce );
+	dMagForce = FindBestForceForTrajectory(pSoldier->sGridNo, sGridNo, sStartZ, sEndZ, dDegrees, pItem, psFinalGridNo);
 
 	// Adjust due to max range....
 	dMaxForce = CalculateSoldierMaxForce(pSoldier, pItem, fArmed);
@@ -1694,9 +1655,7 @@ BOOLEAN CalculateLaunchItemChanceToGetThrough(const SOLDIERTYPE* pSoldier, const
 	vDirNormal.z = (float)sin( dDegrees );
 
 	// Do force....
-	vForce.x = dForce * vDirNormal.x;
-	vForce.y = dForce * vDirNormal.y;
-	vForce.z = dForce * vDirNormal.z;
+	vForce = vDirNormal * dForce;
 
 	// OK, we have our force, calculate change to get through without collide
 	if ( ChanceToGetThroughObjectTrajectory( sEndZ, pItem, &vPosition, &vForce, psFinalGridNo, pbLevel, fFromUI ) == 0 )
@@ -1720,7 +1679,6 @@ BOOLEAN CalculateLaunchItemChanceToGetThrough(const SOLDIERTYPE* pSoldier, const
 
 static FLOAT CalculateForceFromRange(INT16 sRange, FLOAT dDegrees)
 {
-	FLOAT      dMagForce;
 	INT16      sSrcGridNo, sDestGridNo;
 	OBJECTTYPE Object;
 	INT16      sFinalGridNo;
@@ -1733,9 +1691,8 @@ static FLOAT CalculateForceFromRange(INT16 sRange, FLOAT dDegrees)
 	// Use a grenade objecttype
 	CreateItem( HAND_GRENADE, 100, &Object );
 
-	FindBestForceForTrajectory( sSrcGridNo, sDestGridNo, GET_SOLDIER_THROW_HEIGHT( 0 ), 0, dDegrees, &Object, &sFinalGridNo, &dMagForce );
-
-	return( dMagForce );
+	return FindBestForceForTrajectory(sSrcGridNo, sDestGridNo,
+		GET_SOLDIER_THROW_HEIGHT(0), 0, dDegrees, &Object, &sFinalGridNo);
 }
 
 
@@ -1849,9 +1806,7 @@ void CalculateLaunchItemParamsForThrow(SOLDIERTYPE* const pSoldier, INT16 sGridN
 	vDirNormal.z = (float)sin( dDegrees );
 
 	// Do force....
-	vForce.x = dForce * vDirNormal.x;
-	vForce.y = dForce * vDirNormal.y;
-	vForce.z = dForce * vDirNormal.z;
+	vForce = vDirNormal * dForce;
 
 	SetTempObject(pSoldier, *pItem);
 
@@ -2260,4 +2215,290 @@ static UINT16 RandomGridFromRadius(INT16 sSweetGridNo, INT8 ubMinRadius, INT8 ub
 			return sGridNo;
 		}
 	}
+}
+
+
+static CollisionEnums CheckForCollision(FLOAT dX, FLOAT dY, FLOAT dZ,
+	FLOAT dDeltaX, FLOAT dDeltaY, FLOAT dDeltaZ, UINT16* pusStructureID,
+	FLOAT* pdNormalX, FLOAT* pdNormalY, FLOAT* pdNormalZ)
+{
+	INT32 iCurrAboveLevelZ;
+	INT32 iCurrCubesAboveLevelZ;
+	INT16 sDesiredLevel;
+
+	MAP_ELEMENT * pMapElement;
+	STRUCTURE * pStructure, *pTempStructure;
+
+	SOLDIERTYPE * pTarget;
+	FLOAT dTargetZMax;
+
+	INT16 sX, sY;
+
+	FLOAT dOldZUnits, dZUnits;
+
+	INT8 bLOSIndexX, bLOSIndexY;
+
+
+	sX = (INT16)( dX / CELL_X_SIZE );
+	sY = (INT16)( dY / CELL_Y_SIZE );
+
+	if (sX < 0 || sX >= WORLD_COLS || sY < 0 || sY >= WORLD_ROWS)
+	{
+		SLOGW("CheckForCollision coordinates out of bounds");
+		return COLLISION_NONE;
+	}
+
+	// check a particular tile
+	// retrieve values from world for this particular tile
+	pMapElement = &(gpWorldLevelData[ sX + sY * WORLD_COLS] );
+
+	// Calculate old height and new hieght in pixels
+	dOldZUnits = (dZ - dDeltaZ );
+	dZUnits = dZ;
+
+	//BOOLEAN fRoofPresent = FALSE;
+	//if (pBullet->fCheckForRoof)
+	//{
+	//	if (pMapElement->pRoofHead != NULL)
+	//	{
+	//		fRoofPresent = TRUE;
+	//	}
+	//	else
+	//	{
+	//		fRoofPresent = FALSE;
+	//	}
+	//}
+
+	//if (pMapElement->pMercHead != NULL && pBullet->iLoop != 1)
+	if (pMapElement->pMercHead != NULL )
+	{
+		// a merc! that isn't us :-)
+		pTarget = pMapElement->pMercHead->pSoldier;
+		CalculateSoldierZPos( pTarget, HEIGHT, &dTargetZMax );
+	}
+	else
+	{
+		pTarget = NULL;
+	}
+
+	// record old tile location for loop purposes
+
+	// check for collision with the ground
+	iCurrAboveLevelZ = (INT32) dZ;
+	if (iCurrAboveLevelZ < 0)
+	{
+		// ground is in the way!
+		return Water(pMapElement->ubTerrainID) ? COLLISION_WATER : COLLISION_GROUND;
+	}
+	// check for the existence of structures
+	pStructure = pMapElement->pStructureHead;
+	if (pStructure == NULL)
+	{	// no structures in this tile
+
+		// we can go as far as we like vertically (so long as we don't hit
+		// the ground), but want to stop when we get to the next tile or
+		// the end of the LOS path
+
+		// move 1 unit along the bullet path
+		//if (fRoofPresent)
+		//{
+		//	dLastZ = pBullet->dCurrZ;
+		//	(pBullet->dCurrZ) += pBullet->dIncrZ;
+		//	if ( (dLastZ > WALL_HEIGHT && pBullet->dCurrZ < WALL_HEIGHT) || (dLastZ < WALL_HEIGHT && pBullet->dCurrZ > WALL_HEIGHT))
+		//	{
+		//		// generate roof-hitting event
+		//		BulletHitStructure(pBullet);
+		//		RemoveBullet(pBullet);
+		//		return;
+		//	}
+		//}
+		//else
+		//{
+		//	(pBullet->dCurrZ) += pBullet->dIncrZ;
+		//}
+
+		// check for ground collision
+		if ( dZ < 0)
+		{
+			// ground is in the way!
+			return Water(pMapElement->ubTerrainID) ? COLLISION_WATER : COLLISION_GROUND;
+		}
+
+		if ( gfCaves || gfBasement )
+		{
+			if ( dOldZUnits > HEIGHT_UNITS && dZUnits  < HEIGHT_UNITS )
+			{
+				return( COLLISION_ROOF );
+			}
+			if ( dOldZUnits < HEIGHT_UNITS && dZUnits  > HEIGHT_UNITS )
+			{
+				return( COLLISION_INTERIOR_ROOF );
+			}
+		}
+
+		// check to see if we hit someone
+		//if (pTarget && Distance2D( dX - dTargetX, dY - dTargetY ) < HIT_DISTANCE )
+		//{
+		//	// well, we're in the right area; it's possible that
+		//	// we're firing over or under them though
+		//	if ( dZ < dTargetZMax && dZ > dTargetZMin)
+		//	{
+		//		return( COLLISION_MERC );
+		//	}
+		//}
+
+	}
+	else
+	{
+		// there are structures in this tile
+		iCurrCubesAboveLevelZ = CONVERT_HEIGHTUNITS_TO_INDEX( iCurrAboveLevelZ );
+		// figure out the LOS cube level of the current point
+
+		// CALCULAT LOS INDEX
+		bLOSIndexX = CONVERT_WITHINTILE_TO_INDEX( ((INT32)dX) % CELL_X_SIZE );
+		bLOSIndexY = CONVERT_WITHINTILE_TO_INDEX( ((INT32)dY) % CELL_Y_SIZE );
+
+		if (iCurrCubesAboveLevelZ < STRUCTURE_ON_ROOF_MAX)
+		{
+			if (iCurrCubesAboveLevelZ < STRUCTURE_ON_GROUND_MAX)
+			{
+				// check objects on the ground
+				sDesiredLevel = STRUCTURE_ON_GROUND;
+			}
+			else
+			{
+				// check objects on roofs
+				sDesiredLevel = STRUCTURE_ON_ROOF;
+				iCurrCubesAboveLevelZ -= STRUCTURE_ON_ROOF;
+			}
+
+			// Prioritize roof over some other structure's collision returning first
+			if (pMapElement->pRoofHead || gfCaves || gfBasement)
+			{
+				if (dOldZUnits > HEIGHT_UNITS && dZUnits < HEIGHT_UNITS)
+				{
+					return(COLLISION_ROOF);
+				}
+				if (dOldZUnits < HEIGHT_UNITS && dZUnits  > HEIGHT_UNITS)
+				{
+					return(COLLISION_INTERIOR_ROOF);
+				}
+			}
+
+			// check structures for collision
+			while (pStructure != NULL)
+			{
+				if (pStructure->sCubeOffset == sDesiredLevel)
+				{
+
+					if (((*(pStructure->pShape))[bLOSIndexX][bLOSIndexY] & AtHeight[iCurrCubesAboveLevelZ]) > 0)
+					{
+						*pusStructureID = pStructure->usStructureID;
+
+						if (pStructure->fFlags & STRUCTURE_WALLNWINDOW && dZ >= WINDOW_BOTTOM_HEIGHT_UNITS &&
+							dZ <= WINDOW_TOP_HEIGHT_UNITS)
+						{
+							if (pStructure->ubWallOrientation & ORIENT_RIGHT)
+							{
+								return dDeltaX > 0 ? COLLISION_WINDOW_SOUTHWEST : COLLISION_WINDOW_NORTHWEST;
+							}
+							else
+							{
+								return dDeltaY > 0 ? COLLISION_WINDOW_SOUTHEAST : COLLISION_WINDOW_NORTHEAST;
+							}
+						}
+
+						if (pStructure->fFlags & STRUCTURE_WALLSTUFF )
+						{
+							*pdNormalX = 0;
+							*pdNormalY = 0;
+							*pdNormalZ = 0;
+							bool isDeltaXPositive{ dDeltaX > 0 };
+
+							if (pStructure->ubWallOrientation & ORIENT_RIGHT)
+							{
+								*pdNormalX = isDeltaXPositive ? -1 : 1;
+								return isDeltaXPositive ? COLLISION_WALL_SOUTHEAST : COLLISION_WALL_NORTHEAST;
+							}
+							else
+							{
+								*pdNormalY = isDeltaXPositive ? -1 : 1;
+								return isDeltaXPositive ? COLLISION_WALL_SOUTHWEST : COLLISION_WALL_NORTHWEST;
+							}
+
+						}
+						else
+						{
+							// Determine if we are on top of this struct
+							// If we are a tree, not dense enough to stay!
+							if (!(pStructure->fFlags & STRUCTURE_TREE) && !(pStructure->fFlags & STRUCTURE_CORPSE))
+							{
+								if ( iCurrCubesAboveLevelZ < PROFILE_Z_SIZE-1 )
+								{
+									if (!((*(pStructure->pShape))[bLOSIndexX][bLOSIndexY] & AtHeight[ iCurrCubesAboveLevelZ + 1 ]))
+									{
+										return pStructure->fFlags & STRUCTURE_ROOF ? COLLISION_ROOF : COLLISION_STRUCTURE_Z;
+									}
+								}
+								else
+								{
+									// Search next level ( if we are ground )
+									if ( sDesiredLevel == STRUCTURE_ON_GROUND )
+									{
+										pTempStructure = pMapElement->pStructureHead;
+
+										// LOOK at ALL structs on roof
+										while ( pTempStructure != NULL )
+										{
+											if (pTempStructure->sCubeOffset == STRUCTURE_ON_ROOF )
+											{
+												if ( !((*(pTempStructure->pShape))[bLOSIndexX][bLOSIndexY] & AtHeight[ 0 ]) )
+												{
+													return( COLLISION_STRUCTURE_Z );
+												}
+
+											}
+
+											pTempStructure = pTempStructure->pNext;
+										}
+									}
+									else
+									{
+										// We are very high!
+										return( COLLISION_STRUCTURE_Z );
+									}
+								}
+							}
+
+							// Check armour rating.....
+							// ATE; not if small vegitation....
+							if ( pStructure->pDBStructureRef->pDBStructure->ubArmour != MATERIAL_LIGHT_VEGETATION )
+							{
+								if ( !(pStructure->fFlags & STRUCTURE_CORPSE ) )
+								{
+									return( COLLISION_STRUCTURE );
+								}
+							}
+						}
+					}
+				}
+				pStructure = pStructure->pNext;
+			}
+
+		}
+
+		// check to see if we hit someone
+		//if (pTarget && Distance2D( dX - dTargetX, dY - dTargetY ) < HIT_DISTANCE )
+		//{
+		//	// well, we're in the right area; it's possible that
+		//	// we're firing over or under them though
+		//	if ( dZ < dTargetZMax && dZ > dTargetZMin)
+		//	{
+		//		return( COLLISION_MERC );
+		//	}
+		//}
+
+	}
+
+	return( COLLISION_NONE );
 }

@@ -53,7 +53,7 @@ public:
 	bool extra_attachments;               // allow more item attachments options
 	bool skip_sleep_explanation;          // skip annoying popups
 
-	bool middle_mouse_look;               // Look cursor with middle mouse button
+	bool extra_mousewheel_actions;        // Extra tactical mouse wheel bindings: look cursor on wheel click, aim level on wheel scroll
 	bool can_enter_turnbased;             // 'd' can start turnbased if in real-time
 
 	bool ai_better_aiming_choice;         // decide where to shoot depending on to-hit probability if random choice is being made
@@ -61,8 +61,10 @@ public:
 	int8_t threshold_cth_head;            // threshold AI always take head shots, increase game difficulty
 	int8_t threshold_cth_legs;            // threshold AI switch to leg shots from torso
 
-	bool avoid_ambushes;                  // AI able to recognize and avoid ambushes on seeing friendlies' corpses
+	uint8_t corpse_warning_duration;      // how long a fresh corpse keeps warning the AI of a possible ambush; 0 disables ambush avoidance entirely
+	uint8_t corpse_warning_distance;      // how far from a corpse, in tiles, the AI still heeds that warning
 	bool stay_on_rooftop;                 // AI on guard on rooftop are disallowed to go down
+	bool avoid_light_tiles_at_night;      // at night, AI soldiers path around lit tiles the player can see
 
 	bool interrupt_after_being_under_fire; // only being shot at during the turn in progress blocks a soldier's interrupts; vanilla keeps them blocked through the next turn too, since the under-fire mark is only cleared once their own turn begins. Applies to mercs and AI alike
 
@@ -97,6 +99,7 @@ public:
 	int32_t imp_attribute_bonus;          // IMP character attribute unallocated bonus points, vanilla 40
 	int32_t imp_attribute_zero_bonus;     // IMP character attribute points given instead of imp_attribute_min, vanilla 15
 	bool imp_pick_skills_directly;        // Use the IMP_SkillTrait selection screen from JA2.5, skipping the personality quiz, vanilla falase
+	uint8_t imp_max_characters;           // Number of IMP characters that can be created in one campaign, capped by the I.M.P. slots the data declares and the free profiles past the vanilla ones, vanilla 1
 
 	/* M.E.R.C. */
 	uint8_t merc_online_min_days;         // The earliest day on or after which M.E.R.C. goes online

@@ -6,7 +6,7 @@ That being said, not all contributions are welcome, since the project has a defi
 
 Play the game and see what bothers you, what bug you hit, then report it and try to fix it. If you don't have an itch to scratch, we suggest looking at our bug tracker, for example the [help wanted](https://github.com/ja2-stracciatella/ja2-stracciatella/issues?q=is%3Aopen+is%3Aissue+label%3A%22help+wanted%22) list.
 
-Instructions on building and IDE setup can be found in [COMPILATION](https://github.com/ja2-stracciatella/ja2-stracciatella/blob/master/COMPILATION.md).
+Instructions on building and IDE setup can be found in [COMPILATION](https://github.com/ja2-stracciatella/ja2-stracciatella/blob/master/COMPILATION.md). Consider reading (or contributing to) our [docs]([docs/](https://github.com/ja2-stracciatella/ja2-stracciatella/tree/master/docs) directory. Code-specific documentation can be generated locally there.
 
 If you are not a developer, there are many other possibilities which do not require programming skills to help JA2 Stracciatella to evolve. For example, you can help by retesting bug reports labelled with [retest](https://github.com/ja2-stracciatella/ja2-stracciatella/issues?q=is%3Aopen+is%3Aissue+label%3Aretest), help triage bugs, test solutions, research, create mods and more.
 
@@ -35,8 +35,9 @@ All of this makes reviewing and bisecting for regressions easier.
 
 1. New code should have tests if possible.
 
-### For maintainers
+### For developers with commit access
 
-1. Merge a PR only after it has at least one other approval and it builds successfully on all buildbots (currently AppVeyor and GitHub Actions).
+0. The master branch is considered protected, meaning changes are expected to go in through PRs.
+1. Merge a PR only after it has at least one other approval and it builds successfully on all buildbots (or the failures are known to be unrelated).
 2. Squash merge only if the history is a mess or it makes more sense (eg. the whitespace sync PR).
-3. For release planning check the milestones (copied over each time) and the [checklist](https://github.com/ja2-stracciatella/ja2-stracciatella/blob/master/docs/Release-checklist.md)
+3. For release planning check the milestones and the [checklist](https://github.com/ja2-stracciatella/ja2-stracciatella/blob/master/docs/Release-checklist.md)

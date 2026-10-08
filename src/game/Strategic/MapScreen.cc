@@ -2896,6 +2896,22 @@ static void HandleModShift(UINT const key)
 			SelectAllCharactersInSquad(squad_no);
 			break;
 		}
+
+		case 'r':
+			// Refill the mercs' copies of the pointed at item from the sector stash
+			if (gamepolicy(isHotkeyEnabled(UI_Map, HKMOD_SHIFT, 'r')) && fShowMapInventoryPool)
+			{
+				RefillMercItemsFromMapInventoryPool();
+			}
+			break;
+
+		case 's':
+			// Combine the sector inventory into full stacks and sort it
+			if (gamepolicy(isHotkeyEnabled(UI_Map, HKMOD_SHIFT, 's')) && fShowMapInventoryPool)
+			{
+				StackAndSortMapInventoryPool();
+			}
+			break;
 	}
 }
 
@@ -3232,6 +3248,12 @@ void EndMapScreen( BOOLEAN fDuringFade )
 	// update paused states, we are exiting...need to reset for any pathing or menus displayed
 	UnLockPauseState( );
 	UpdatePausedStatesDueToTimeCompression( );
+
+	// nothing in tactical would lift a pause the mapscreen left behind
+	if ( guiPendingScreen == GAME_SCREEN && !gfPauseDueToPlayerGamePause )
+	{
+		UnPauseGame( );
+	}
 
 	if( !gfDontStartTransitionFromLaptop )
 	{

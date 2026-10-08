@@ -322,7 +322,6 @@ static const UINT8 gubMaxActionPoints[] =
 INT8 CalcActionPoints(const SOLDIERTYPE* const pSold)
 {
 	UINT8 ubPoints,ubMaxAPs;
-	INT8  bBandage;
 
 	// dead guys don't get any APs (they shouldn't be here asking for them!)
 	if (!pSold->bLife)
@@ -339,13 +338,10 @@ INT8 CalcActionPoints(const SOLDIERTYPE* const pSold)
 			2 * pSold->bLifeMax   +
 			2 * EffectiveDexterity( pSold ) ) + 20) / 40);
 
-	// Calculate bandage
-	bBandage = pSold->bLifeMax - pSold->bLife - pSold->bBleeding;
-
 	// If injured, reduce action points accordingly (by up to 2/3rds)
 	if (pSold->bLife < pSold->bLifeMax)
 	{
-		ubPoints -= (2 * ubPoints * (pSold->bLifeMax - pSold->bLife + (bBandage / 2))) /
+		ubPoints -= (2 * ubPoints * (pSold->bLifeMax - pSold->effectiveLife())) /
 				(3 * pSold->bLifeMax);
 	}
 
@@ -3256,6 +3252,15 @@ static void SoldierGotHitExplosion(SOLDIERTYPE* const pSoldier, const UINT16 usW
 	ReceivingSoldierCancelServices( pSoldier );
 	GivingSoldierCancelServices( pSoldier );
 
+	// A grenade landing on an occupied tile hits the soldier on the way down, and that
+	// hit animation is non-interruptible. Let the blast knock them down anyway.
+	if ( gAnimControl[ pSoldier->usAnimState ].uiFlags & ANIM_HITSTART &&
+		gAnimControl[ pSoldier->usAnimState ].ubEndHeight != ANIM_PRONE )
+	{
+		pSoldier->usPendingAnimation = NO_PENDING_ANIMATION;
+		pSoldier->fInNonintAnim      = FALSE;
+		pSoldier->fRTInNonintAnim    = FALSE;
+	}
 
 	if ( gGameSettings.fOptions[ TOPTION_BLOOD_N_GORE ] )
 	{
@@ -4162,7 +4167,7 @@ BOOLEAN ConvertAniCodeToAniFrame(SOLDIERTYPE* const s, UINT16 ani_frame)
 	UINT8 temp_dir = OneCDirection(s->bDirection);
 
 	// Check # of directions/surface, adjust if ness.
-	switch (as.uiNumDirections)
+	switch (as.ubNumDirections)
 	{
 		case  1: temp_dir  = 0;                                     break;
 		case  4: temp_dir /= 2;                                     break;
@@ -4191,12 +4196,12 @@ BOOLEAN ConvertAniCodeToAniFrame(SOLDIERTYPE* const s, UINT16 ani_frame)
 	}
 	else
 	{
-		ani_frame += as.uiNumFramesPerDir * temp_dir;
+		ani_frame += as.usNumFramesPerDir * temp_dir;
 		if (ani_frame >= as.hVideoObject->SubregionCount())
 		{
 			// Debug msg here....
 			SLOGW("Wrong Number of frames per number of objects: {} vs {}, {}",
-				as.uiNumFramesPerDir, as.hVideoObject->SubregionCount(),
+				as.usNumFramesPerDir, as.hVideoObject->SubregionCount(),
 				gAnimControl[s->usAnimState].zAnimStr);
 			ani_frame = 0;
 		}
@@ -6004,7 +6009,7 @@ no_sub:
 	ST::string basename;
 	if (s->ubProfile != NO_PROFILE)
 	{
-		basename = ST::format("{03d}", s->ubProfile);
+		basename = ST::format("{03d}", GetProfile(s->ubProfile).ubVoiceId);
 	}
 	else
 	{
@@ -8050,16 +8055,11 @@ void SoldierCollapse( SOLDIERTYPE *pSoldier )
 
 static FLOAT CalcSoldierNextBleed(SOLDIERTYPE* pSoldier)
 {
-	INT8 bBandaged;
-
 	// calculate how many turns before he bleeds again
 	// bleeding faster the lower life gets, and if merc is running around
 	//pSoldier->nextbleed = 2 + (pSoldier->life / (10 + pSoldier->tilesMoved));  // min = 2
 
-	// if bandaged, give 1/2 of the bandaged life points back into equation
-	bBandaged = pSoldier->bLifeMax - pSoldier->bLife - pSoldier->bBleeding;
-
-	return( (FLOAT)1 + (FLOAT)( (pSoldier->bLife + bBandaged / 2) / (10 + pSoldier->bTilesMoved) ) );  // min = 1
+	return( (FLOAT)1 + (FLOAT)pSoldier->effectiveLife() / (10 + pSoldier->bTilesMoved) );  // min = 1
 }
 
 

@@ -35,6 +35,7 @@
 #include "IMP_Compile_Character.h"
 #include "IMP_Confirm.h"
 #include "IMP_Portraits.h"
+#include "IMPProfileJson.h"
 #include "Interface_Dialogue.h"
 #include "Interface_Items.h"
 #include "Interface_Panels.h"
@@ -117,6 +118,7 @@
 
 #include <regex>
 #include <algorithm>
+#include <memory>
 #include <array>
 #include <stdexcept>
 #include <utility>
@@ -926,7 +928,7 @@ void LoadSavedGame(const ST::string &saveName)
 	BAR(1, "Backed up NPC Info...");
 	if (version >= 53)
 	{
-		LoadBackupNPCInfoFromSavedGameFile(f);
+		LoadBackupNPCInfoFromSavedGameFile(f, version);
 	}
 
 	BAR(1, "Meanwhile definitions...");
@@ -1196,6 +1198,12 @@ void LoadSavedGame(const ST::string &saveName)
 }
 
 
+UINT32 NumProfilesInSavedGame(UINT32 const savegame_version)
+{
+	return savegame_version < 105 ? NUM_VANILLA_PROFILES : NUM_PROFILES;
+}
+
+
 static void SaveMercProfiles(HWFILE const f)
 {
 	// Loop through all the profiles to save
@@ -1205,11 +1213,21 @@ static void SaveMercProfiles(HWFILE const f)
 		InjectMercProfile(data, *i);
 		NewJA2EncryptedFileWrite(f, data, sizeof(data));
 	}
+
+	// The profile record is full, and its layout is also prof.dat's, so fields
+	// added since follow the records, one block per field.
+	BYTE voiceIds[NUM_PROFILES];
+	for (UINT32 i = 0; i != NUM_PROFILES; ++i) voiceIds[i] = gMercProfiles[i].ubVoiceId;
+	f->write(voiceIds, sizeof(voiceIds));
+
+	BYTE impSlotStates[NUM_PROFILES];
+	for (UINT32 i = 0; i != NUM_PROFILES; ++i) impSlotStates[i] = static_cast<BYTE>(gMercProfiles[i].impSlotState);
+	f->write(impSlotStates, sizeof(impSlotStates));
 }
 
 ST::string IMPSavedProfileCreateFilename(const ST::string& nickname)
 {
-	return ST::format("mercprofile.{}", nickname);
+	return ST::format("mercprofile.{}.json", nickname);
 }
 
 bool IMPSavedProfileDoesFileExist(const ST::string& nickname)
@@ -1219,36 +1237,31 @@ bool IMPSavedProfileDoesFileExist(const ST::string& nickname)
 	return fexists;
 }
 
-SGPFile* IMPSavedProfileOpenFileForRead(const ST::string& nickname)
+static void IMPSavedProfileRead(const ST::string& nickname, MERCPROFILESTRUCT& profile, OBJECTTYPE (&inv)[NUM_INV_SLOTS])
 {
 	if (!IMPSavedProfileDoesFileExist(nickname)) {
 		throw std::runtime_error(ST::format("Lost IMP with nickname '{}'!", nickname).to_std_string());
 	}
-	SGPFile *f = GCM->saveGameFiles()->openForReading(IMPSavedProfileCreateFilename(nickname));
-	return f;
+	std::unique_ptr<SGPFile> f{ GCM->saveGameFiles()->openForReading(IMPSavedProfileCreateFilename(nickname)) };
+	DeserializeIMPProfile(f->readStringToEnd(), profile, inv);
 }
 
-static SGPFile* IMPSavedProfileOpenFileForWrite(const ST::string& nickname)
+/* Restores a saved I.M.P. into the slot the character being built would take.
+ * The character keeps the voice it was made with, which the saved profile
+ * carries itself. Throws if the file cannot be read, before anything changed. */
+ProfileID IMPSavedProfileLoadMercProfile(const ST::string& nickname)
 {
-	ST::string profile_filename = IMPSavedProfileCreateFilename(nickname);
-	SGPFile *f = GCM->saveGameFiles()->openForWriting(profile_filename, true);
-	return f;
-}
-
-int IMPSavedProfileLoadMercProfile(const ST::string& nickname)
-{
-	if (!IMPSavedProfileDoesFileExist(nickname)) {
-		throw std::runtime_error(ST::format("Lost IMP with nickname '{}'!", nickname).to_std_string());
-	}
-	SGPFile *f = IMPSavedProfileOpenFileForRead(nickname);
 	MERCPROFILESTRUCT profile_saved;
-	f->read(&profile_saved, sizeof(MERCPROFILESTRUCT));
-	delete f;
-	int voiceid = profile_saved.ubSuspiciousDeath;
-	MERCPROFILESTRUCT& profile_new = gMercProfiles[PLAYER_GENERATED_CHARACTER_ID + voiceid];
+	OBJECTTYPE inv[NUM_INV_SLOTS];
+	IMPSavedProfileRead(nickname, profile_saved, inv);
+
+	ProfileID const profile = GetIMPSlotInProgress();
+	MERCPROFILESTRUCT& profile_new = gMercProfiles[profile];
 	profile_new = profile_saved;
 	profile_new.bMercStatus = MERC_OK;
-	return voiceid;
+	// The slot is not held until the player confirms the character.
+	profile_new.impSlotState = IMPSlotState::FREE;
+	return profile;
 }
 
 void IMPSavedProfileLoadInventory(const ST::string& nickname, SOLDIERTYPE *pSoldier)
@@ -1256,10 +1269,20 @@ void IMPSavedProfileLoadInventory(const ST::string& nickname, SOLDIERTYPE *pSold
 	if (!IMPSavedProfileDoesFileExist(nickname)) return;
 	if (!pSoldier) return;
 
-	SGPFile *f = IMPSavedProfileOpenFileForRead(nickname);
-	f->seek(sizeof(MERCPROFILESTRUCT), FILE_SEEK_FROM_START);
-	f->read(pSoldier->inv, sizeof(OBJECTTYPE) * NUM_INV_SLOTS);
-	delete f;
+	MERCPROFILESTRUCT profile;
+	OBJECTTYPE inv[NUM_INV_SLOTS];
+	try
+	{
+		IMPSavedProfileRead(nickname, profile, inv);
+	}
+	catch (const std::exception& e)
+	{
+		// The profile was read before, so the file changed since: keep the
+		// inventory the character was given.
+		SLOGE("I.M.P. '{}' keeps its inventory, the saved one could not be read: {}", nickname, e.what());
+		return;
+	}
+	std::copy(std::begin(inv), std::end(inv), std::begin(pSoldier->inv));
 }
 
 void SaveIMPPlayerProfiles()
@@ -1276,23 +1299,35 @@ void SaveIMPPlayerProfiles()
 		if (pSoldier->bTeam != OUR_TEAM) continue;
 		if (pSoldier->ubWhatKindOfMercAmI != MERC_TYPE__PLAYER_CHARACTER) continue;
 
-		SGPFile *f = IMPSavedProfileOpenFileForWrite(mercprofile->zNickname);
+		ST::string const json = SerializeIMPProfile(*mercprofile, pSoldier->inv);
+		std::unique_ptr<SGPFile> f{ GCM->saveGameFiles()->openForWriting(IMPSavedProfileCreateFilename(mercprofile->zNickname), true) };
 		if (!f) continue;
-
-		mercprofile->ubSuspiciousDeath = i - PLAYER_GENERATED_CHARACTER_ID; // save voice_id, field not used for resuscitated merc
-		f->write(mercprofile, sizeof(MERCPROFILESTRUCT));
-		f->write(pSoldier->inv, sizeof(OBJECTTYPE) * NUM_INV_SLOTS);
-		delete f;
+		f->write(json.c_str(), json.size());
 	}
 }
 
 static void LoadSavedMercProfiles(HWFILE const f, UINT32 const savegame_version, bool stracLinuxFormat)
 {
+	/* Saves written before the profiles were extended hold the vanilla ones
+	 * only. The slots past them are not in the file, so they are set up as a
+	 * new campaign would have them, and whatever the data files declare there
+	 * is honoured in a game saved before it was installed. */
+	UINT32 const profiles_in_save = NumProfilesInSavedGame(savegame_version);
+	if (profiles_in_save < NUM_PROFILES)
+	{
+		GCM->resetMercProfileStructs();
+		for (ProfileID i = profiles_in_save; i != NUM_PROFILES; ++i)
+		{
+			InitProfileFromContent(i);
+		}
+	}
+
 	// Loop through all the profiles to load
 	void (&reader)(HWFILE, BYTE*, UINT32) = savegame_version < 87 ?
 		JA2EncryptedFileRead : NewJA2EncryptedFileRead;
-	for (auto & profile : gMercProfiles)
+	for (UINT32 i = 0; i != profiles_in_save; ++i)
 	{
+		MERCPROFILESTRUCT& profile = gMercProfiles[i];
 		UINT32 checksum;
 		std::array<BYTE, std::max(MERC_PROFILE_SIZE_STRAC_LINUX, MERC_PROFILE_SIZE)> data;
 		UINT32 dataSize = stracLinuxFormat ? MERC_PROFILE_SIZE_STRAC_LINUX : MERC_PROFILE_SIZE;
@@ -1303,6 +1338,29 @@ static void LoadSavedMercProfiles(HWFILE const f, UINT32 const savegame_version,
 			throw std::runtime_error("Merc profile checksum mismatch");
 		}
 	}
+
+	if (savegame_version < 104)
+	{
+		// Before the voice id existed every character spoke with the files
+		// named after its own profile.
+		for (UINT32 i = 0; i != NUM_PROFILES; ++i) gMercProfiles[i].ubVoiceId = i;
+
+		// One I.M.P. was the limit, and it lived in the slot iVoiceId pointed
+		// at. The laptop block is read before this one, so it can be believed.
+		if (LaptopSaveInfo.fIMPCompletedFlag)
+		{
+			gMercProfiles[PLAYER_GENERATED_CHARACTER_ID + LaptopSaveInfo.iVoiceId].impSlotState = IMPSlotState::TAKEN;
+		}
+		return;
+	}
+
+	BYTE voiceIds[NUM_PROFILES];
+	f->read(voiceIds, profiles_in_save);
+	for (UINT32 i = 0; i != profiles_in_save; ++i) gMercProfiles[i].ubVoiceId = voiceIds[i];
+
+	BYTE impSlotStates[NUM_PROFILES];
+	f->read(impSlotStates, profiles_in_save);
+	for (UINT32 i = 0; i != profiles_in_save; ++i) gMercProfiles[i].impSlotState = static_cast<IMPSlotState>(impSlotStates[i]);
 }
 
 
@@ -2498,3 +2556,132 @@ SaveGameInfo::SaveGameInfo(ST::string name_, HWFILE file) : saveName(std::move(n
 		}
 	}
 }
+
+
+#ifdef WITH_UNITTESTS
+#include "DefaultContentManagerUT.h"
+#include "gtest/gtest.h"
+
+namespace
+{
+	/* Writes the merc profile section the way a save holding the given number
+	 * of profiles writes it: the full record for each, and then a block of one
+	 * byte per profile for each field that does not fit in the record. Written
+	 * out here rather than borrowed from SaveMercProfiles, so that the tests
+	 * state the format they expect instead of agreeing with whatever the
+	 * writer happens to do. */
+	void WriteMercProfileSection(HWFILE const f, UINT32 const profiles)
+	{
+		for (UINT32 i = 0; i != profiles; ++i)
+		{
+			BYTE data[MERC_PROFILE_SIZE];
+			InjectMercProfile(data, gMercProfiles[i]);
+			NewJA2EncryptedFileWrite(f, data, sizeof(data));
+		}
+
+		for (UINT32 i = 0; i != profiles; ++i)
+		{
+			BYTE const voiceId = gMercProfiles[i].ubVoiceId;
+			f->write(&voiceId, 1);
+		}
+
+		for (UINT32 i = 0; i != profiles; ++i)
+		{
+			BYTE const impSlotState = static_cast<BYTE>(gMercProfiles[i].impSlotState);
+			f->write(&impSlotState, 1);
+		}
+	}
+
+	/* Something recognisable in every profile, so that a profile read back can
+	 * be told from one the loader filled in itself. */
+	void MarkEveryProfile()
+	{
+		for (UINT32 i = 0; i != NUM_PROFILES; ++i)
+		{
+			gMercProfiles[i] = MERCPROFILESTRUCT{};
+			gMercProfiles[i].ubVoiceId = static_cast<UINT8>(NUM_PROFILES - 1 - i);
+			gMercProfiles[i].impSlotState = i % 2 == 0 ? IMPSlotState::TAKEN : IMPSlotState::FREE;
+		}
+	}
+}
+
+TEST(SaveLoadGameTest, profilesInSavedGameByVersion)
+{
+	// The profiles past the vanilla ones were added in version 105.
+	EXPECT_EQ(NumProfilesInSavedGame(53),  UINT32{ NUM_VANILLA_PROFILES });
+	EXPECT_EQ(NumProfilesInSavedGame(104), UINT32{ NUM_VANILLA_PROFILES });
+	EXPECT_EQ(NumProfilesInSavedGame(105), UINT32{ NUM_PROFILES });
+	EXPECT_EQ(NumProfilesInSavedGame(SAVE_GAME_VERSION), UINT32{ NUM_PROFILES });
+}
+
+/* Reading a profile section of the wrong length leaves the file positioned in
+ * the middle of it, and every section after it in the save is then read from
+ * the wrong offset. These two check the length as much as the contents. */
+TEST(SaveLoadGameTest, mercProfilesFromCurrentSave)
+{
+	std::unique_ptr<DefaultContentManagerUT> cm(DefaultContentManagerUT::createDefaultCMForTesting());
+	ASSERT_TRUE(cm->loadGameData());
+	auto const oldGCM = std::exchange(GCM, cm.get());
+
+	MarkEveryProfile();
+	{
+		AutoSGPFile f(cm->tempFiles()->openForWriting("profiles-105.dat", true));
+		WriteMercProfileSection(f, NUM_PROFILES);
+	}
+
+	for (auto& profile : gMercProfiles) profile = MERCPROFILESTRUCT{};
+
+	AutoSGPFile f(cm->tempFiles()->openForReading("profiles-105.dat"));
+	UINT32 const written = f->size();
+	LoadSavedMercProfiles(f, 105, false);
+
+	EXPECT_EQ(static_cast<UINT32>(f->pos()), written);
+	for (UINT32 i = 0; i != NUM_PROFILES; ++i)
+	{
+		EXPECT_EQ(gMercProfiles[i].ubVoiceId, NUM_PROFILES - 1 - i) << "profile " << i;
+		EXPECT_EQ(gMercProfiles[i].impSlotState,
+			i % 2 == 0 ? IMPSlotState::TAKEN : IMPSlotState::FREE) << "profile " << i;
+	}
+
+	GCM = oldGCM;
+}
+
+TEST(SaveLoadGameTest, mercProfilesFromOlderSave)
+{
+	std::unique_ptr<DefaultContentManagerUT> cm(DefaultContentManagerUT::createDefaultCMForTesting());
+	ASSERT_TRUE(cm->loadGameData());
+	auto const oldGCM = std::exchange(GCM, cm.get());
+
+	MarkEveryProfile();
+	{
+		AutoSGPFile f(cm->tempFiles()->openForWriting("profiles-104.dat", true));
+		WriteMercProfileSection(f, NUM_VANILLA_PROFILES);
+	}
+
+	AutoSGPFile f(cm->tempFiles()->openForReading("profiles-104.dat"));
+	UINT32 const written = f->size();
+	LoadSavedMercProfiles(f, 104, false);
+
+	// The save is read to its end and no further.
+	EXPECT_EQ(static_cast<UINT32>(f->pos()), written);
+
+	for (UINT32 i = 0; i != NUM_VANILLA_PROFILES; ++i)
+	{
+		EXPECT_EQ(gMercProfiles[i].ubVoiceId, NUM_PROFILES - 1 - i) << "profile " << i;
+		EXPECT_EQ(gMercProfiles[i].impSlotState,
+			i % 2 == 0 ? IMPSlotState::TAKEN : IMPSlotState::FREE) << "profile " << i;
+	}
+
+	/* The slots the save predates are not in it, so they hold what a campaign
+	 * starts them with -- speaking with their own voice, and free for an
+	 * I.M.P. -- rather than the marks left in them before the load. */
+	for (UINT32 i = NUM_VANILLA_PROFILES; i != NUM_PROFILES; ++i)
+	{
+		EXPECT_EQ(gMercProfiles[i].ubVoiceId, i) << "profile " << i;
+		EXPECT_EQ(gMercProfiles[i].impSlotState, IMPSlotState::FREE) << "profile " << i;
+	}
+
+	GCM = oldGCM;
+}
+
+#endif

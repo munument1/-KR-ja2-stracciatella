@@ -466,21 +466,23 @@ void GetTargetWorldPositions( SOLDIERTYPE *pSoldier, INT16 sTargetGridNo, FLOAT 
 		{
 			UINT32 const threshold_cth_head = gamepolicy(threshold_cth_head);
 			UINT32 const threshold_cth_legs = gamepolicy(threshold_cth_legs);
-			UINT32 const cth_aim_shot_head = SoldierToSoldierBodyPartChanceToGetThrough( pSoldier, pTargetSoldier, AIM_SHOT_HEAD );
-			UINT32 const cth_aim_shot_torso = SoldierToSoldierBodyPartChanceToGetThrough( pSoldier, pTargetSoldier, AIM_SHOT_TORSO );
-			UINT32 const cth_aim_shot_legs = SoldierToSoldierBodyPartChanceToGetThrough( pSoldier, pTargetSoldier, AIM_SHOT_LEGS );
 
-			UINT32 cth_choice = cth_aim_shot_torso;
+			UINT32 const cth_ctgt_head = SoldierToSoldierBodyPartChanceToGetThrough( pSoldier, pTargetSoldier, AIM_SHOT_HEAD );
+			UINT32 const cth_ctgt_torso = SoldierToSoldierBodyPartChanceToGetThrough( pSoldier, pTargetSoldier, AIM_SHOT_TORSO );
+			UINT32 const cth_ctgt_legs = SoldierToSoldierBodyPartChanceToGetThrough(pSoldier, pTargetSoldier, AIM_SHOT_LEGS);
+
+			UINT32 const cth_aim_shot_head = cth_ctgt_head * CalcChanceToHitGun(pSoldier, sTargetGridNo, pSoldier->bAimTime, AIM_SHOT_HEAD, FALSE) / 100;
+			UINT32 const cth_aim_shot_torso = cth_ctgt_torso * CalcChanceToHitGun(pSoldier, sTargetGridNo, pSoldier->bAimTime, AIM_SHOT_TORSO, FALSE) / 100;
+			UINT32 const cth_aim_shot_legs = cth_ctgt_legs * CalcChanceToHitGun(pSoldier, sTargetGridNo, pSoldier->bAimTime, AIM_SHOT_LEGS, FALSE) / 100;
+
 			pSoldier->bAimShotLocation = AIM_SHOT_TORSO; // default
 
-			if (cth_aim_shot_legs >= threshold_cth_legs || (cth_aim_shot_legs + 5) > cth_choice)
+			if (gAnimControl[pTargetSoldier->usAnimState].ubEndHeight == ANIM_STAND && (cth_aim_shot_legs >= threshold_cth_legs || cth_aim_shot_legs >= cth_aim_shot_torso)) // good enough, override
 			{
 				pSoldier->bAimShotLocation = AIM_SHOT_LEGS;
-				cth_choice = cth_aim_shot_legs;
 			}
 
-			if (cth_aim_shot_head >= threshold_cth_head ||   // good enough, override
-				cth_aim_shot_head >= cth_choice) // close enough, better if extra damage
+			if (cth_aim_shot_head >= threshold_cth_head || cth_aim_shot_head >= cth_aim_shot_torso)  // even better, override
 			{
 				pSoldier->bAimShotLocation = AIM_SHOT_HEAD;
 			}
@@ -643,6 +645,11 @@ static void UseGun(SOLDIERTYPE * const pSoldier, GridNo const sTargetGridNo)
 	}
 
 
+	// ATE; Moved a whole blotch if logic code for finding target positions to a function
+	// so other places can use it
+
+	GetTargetWorldPositions(pSoldier, sTargetGridNo, &dTargetX, &dTargetY, &dTargetZ);
+
 	// CALC CHANCE TO HIT
 	if ( GCM->getItem(usItemNum)->getItemClass() == IC_THROWING_KNIFE )
 	{
@@ -663,10 +670,6 @@ static void UseGun(SOLDIERTYPE * const pSoldier, GridNo const sTargetGridNo)
 	uiDiceRoll = PreRandom( 100 );
 
 	bool const fGonnaHit = uiDiceRoll <= uiHitChance;
-
-	// ATE; Moved a whole blotch if logic code for finding target positions to a function
-	// so other places can use it
-	GetTargetWorldPositions( pSoldier, sTargetGridNo, &dTargetX, &dTargetY, &dTargetZ );
 
 	// Some things we don't do for knives...
 	if ( GCM->getItem(usItemNum)->getItemClass() != IC_THROWING_KNIFE )
@@ -1218,6 +1221,19 @@ void UseHandToHand(SOLDIERTYPE* const pSoldier, INT16 const sTargetGridNo, BOOLE
 			{
 				// CALCULATE DAMAGE!
 				iImpact = HTHImpact( pSoldier, pTargetSoldier, (iHitChance - iDiceRoll), FALSE );
+
+				// modify by hit location (as knives and bullets do); for punches this
+				// scales both breath and life damage since they are split from the same
+				// value downstream in EVENT_SoldierGotHit
+				// (the crit impact is unused here, but the helper requires it)
+				INT32 iImpactForCrits;
+				AdjustImpactByHitLocation( iImpact, pSoldier->bAimShotLocation, &iImpact, &iImpactForCrits );
+
+				// any successful hit does at LEAST 1 pt minimum damage
+				if (iImpact < 1)
+				{
+					iImpact = 1;
+				}
 
 				// Send event for getting hit
 				EV_S_WEAPONHIT SWeaponHit{};
@@ -1968,7 +1984,6 @@ UINT32 CalcChanceToHitGun(SOLDIERTYPE *pSoldier, UINT16 sGridNo, UINT8 ubAimTime
 	UINT16 usInHand;
 	OBJECTTYPE *pInHand;
 	INT8 bAttachPos;
-	INT8 bBandaged;
 	INT16 sDistVis;
 	UINT8 ubAdjAimPos;
 
@@ -2237,7 +2252,9 @@ UINT32 CalcChanceToHitGun(SOLDIERTYPE *pSoldier, UINT16 sGridNo, UINT8 ubAimTime
 		bAttachPos = FindAttachment( pInHand, SNIPERSCOPE );
 
 		// does gun have scope, long range recommends its use, and shooter's aiming?
-		if (bAttachPos != NO_SLOT && (iRange > MIN_SCOPE_RANGE) && (ubAimTime > 0))
+		// Bursts get no aim bonus, so they get no scope bonus either.
+		if (bAttachPos != NO_SLOT && (iRange > MIN_SCOPE_RANGE) && (ubAimTime > 0) &&
+			!pSoldier->bDoBurst)
 		{
 			// reduce effective sight range by 20% per extra aiming time AP of the distance
 			// beyond MIN_SCOPE_RANGE.  Max reduction is 80% of the range beyond.
@@ -2474,11 +2491,8 @@ UINT32 CalcChanceToHitGun(SOLDIERTYPE *pSoldier, UINT16 sGridNo, UINT8 ubAimTime
 	// IF CHANCE EXISTS, BUT SHOOTER IS INJURED
 	if ((iChance > 0) && (pSoldier->bLife < pSoldier->bLifeMax))
 	{
-		// if bandaged, give 1/2 of the bandaged life points back into equation
-		bBandaged = pSoldier->bLifeMax - pSoldier->bLife - pSoldier->bBleeding;
-
 		// injury penalty is based on % damage taken (max 2/3rds chance)
-		iPenalty = (iChance * 2 * (pSoldier->bLifeMax - pSoldier->bLife + (bBandaged / 2))) /
+		iPenalty = (iChance * 2 * (pSoldier->bLifeMax - pSoldier->effectiveLife())) /
 						(3 * pSoldier->bLifeMax);
 
 		// reduce injury penalty due to merc's experience level (he can take it!)
@@ -3201,7 +3215,6 @@ void ShotMiss(const BULLET* const b)
 static UINT32 CalcChanceHTH(SOLDIERTYPE* pAttacker, SOLDIERTYPE* pDefender, UINT8 ubAimTime, UINT8 ubMode, bool skipSafetyCheck = false)
 {
 	UINT16 usInHand;
-	UINT8  ubBandaged;
 	INT32  iAttRating, iDefRating;
 	INT32  iChance;
 
@@ -3291,10 +3304,7 @@ static UINT32 CalcChanceHTH(SOLDIERTYPE* pAttacker, SOLDIERTYPE* pDefender, UINT
 	// If attacker injured, reduce chance accordingly (by up to 2/3rds)
 	if ((iAttRating > 0) && (pAttacker->bLife < pAttacker->bLifeMax))
 	{
-		// if bandaged, give 1/2 of the bandaged life points back into equation
-		ubBandaged = pAttacker->bLifeMax - pAttacker->bLife - pAttacker->bBleeding;
-
-		iAttRating -= (2 * iAttRating * (pAttacker->bLifeMax - pAttacker->bLife + (ubBandaged / 2))) /
+		iAttRating -= (2 * iAttRating * (pAttacker->bLifeMax - pAttacker->effectiveLife())) /
 				(3 * pAttacker->bLifeMax);
 	}
 
@@ -3360,10 +3370,7 @@ static UINT32 CalcChanceHTH(SOLDIERTYPE* pAttacker, SOLDIERTYPE* pDefender, UINT
 	// If defender injured, reduce chance accordingly (by up to 2/3rds)
 	if ((iDefRating > 0) && (pDefender->bLife < pDefender->bLifeMax))
 	{
-		// if bandaged, give 1/2 of the bandaged life points back into equation
-		ubBandaged = pDefender->bLifeMax - pDefender->bLife - pDefender->bBleeding;
-
-		iDefRating -= (2 * iDefRating * (pDefender->bLifeMax - pDefender->bLife + (ubBandaged / 2))) /
+		iDefRating -= (2 * iDefRating * (pDefender->bLifeMax - pDefender->effectiveLife())) /
 		(3 * pDefender->bLifeMax);
 
 	}
@@ -3579,7 +3586,7 @@ UINT32 CalcThrownChanceToHit(SOLDIERTYPE *pSoldier, INT16 sGridNo, UINT8 ubAimTi
 {
 	INT32  iChance, iMaxRange, iRange;
 	UINT16 usHandItem;
-	INT8   bPenalty, bBandaged;
+	INT8   bPenalty;
 
 	if ( pSoldier->bWeaponMode == WM_ATTACHED)
 	{
@@ -3683,11 +3690,8 @@ UINT32 CalcThrownChanceToHit(SOLDIERTYPE *pSoldier, INT16 sGridNo, UINT8 ubAimTi
 	// IF CHANCE EXISTS, BUT ATTACKER IS INJURED
 	if ((iChance > 0) && (pSoldier->bLife < pSoldier->bLifeMax))
 	{
-		// if bandaged, give 1/2 of the bandaged life points back into equation
-		bBandaged = pSoldier->bLifeMax - pSoldier->bLife - pSoldier->bBleeding;
-
 		// injury penalty is based on % damage taken (max 2/3rds iChance)
-		bPenalty = (2 * iChance * (pSoldier->bLifeMax - pSoldier->bLife + (bBandaged / 2))) /
+		bPenalty = (2 * iChance * (pSoldier->bLifeMax - pSoldier->effectiveLife())) /
 				(3 * pSoldier->bLifeMax);
 
 		// for mechanically-fired projectiles, reduce penalty in half
@@ -3797,6 +3801,11 @@ void ChangeWeaponMode(SOLDIERTYPE* const s)
 	}
 
 	EnsureConsistentWeaponMode(s);
+
+	// Aim clicks belong to the mode they were spent in. Burst and launcher mode
+	// cannot refine the aim, so carrying clicks over from normal mode would hand
+	// out their bonus for free - the AP cost of those modes ignores the aim time.
+	s->bShownAimTime = REFINE_AIM_1;
 
 	DirtyMercPanelInterface(s, DIRTYLEVEL2);
 	gfUIForceReExamineCursorData = TRUE;
