@@ -1,0 +1,154 @@
+name: Publish Korean v0.1.0-alpha.3
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/publish-korean-v0.1.0-alpha.3.yml
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: v0.1.0-alpha.3
+      RELEASE_TARGET: d91ff562c5094c3dae1787ae0df5977e80475543
+      BASE_RUN: '37732090369'
+      MOD_RUN: '37732090377'
+    steps:
+      - name: Check whether release already exists
+        id: existing
+        shell: bash
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify build and asset provenance
+        if: steps.existing.outputs.exists != 'true'
+        run: |
+          set -euo pipefail
+          for run in "$BASE_RUN" "$MOD_RUN"; do
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" \
+              --jq 'select(.conclusion == "success" and .head_sha == "d91ff562c5094c3dae1787ae0df5977e80475543") | .id' | grep -E '^[0-9]+$'
+          done
+
+      - name: Download tested Windows build and latest Korean mod
+        if: steps.existing.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work/base work/mod
+          gh run download "$BASE_RUN" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name JA2-Stracciatella-Korean-Windows-Test \
+            --dir work/base
+          gh run download "$MOD_RUN" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name JA2-Stracciatella-Korean-Localization-Mod \
+            --dir work/mod
+
+      - name: Assemble release packages
+        if: steps.existing.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_ZIP="$(find work/base/build-packages -maxdepth 1 -type f -name '*.zip' | head -n 1)"
+          test -n "$BASE_ZIP"
+
+          mkdir -p work/stage
+          unzip -q "$BASE_ZIP" -d work/stage
+          ROOT="$(find work/stage -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+          test -d "$ROOT"
+          test -f "$ROOT/ja2.exe"
+          test -f "$ROOT/ja2-launcher.exe"
+
+          rm -rf "$ROOT/mods/korean-localization"
+          mkdir -p "$ROOT/mods"
+          cp -a work/mod/korean-localization "$ROOT/mods/"
+
+          RELEASE_DIR="work/stage/JA2-Stracciatella-Korean-v0.1.0-alpha.3-Windows"
+          mv "$ROOT" "$RELEASE_DIR"
+
+          cat > "$RELEASE_DIR/KOREAN_RELEASE_INFO.txt" <<'EOF'
+          JA2 Stracciatella Korean v0.1.0-alpha.3
+
+          This package contains a Korean-enabled JA2 Stracciatella Windows build
+          and the Korean Localization mod. Original Jagged Alliance 2 game data
+          is NOT included and must be supplied by the user.
+
+          Windows runtime baseline:
+            d91ff562c5094c3dae1787ae0df5977e80475543
+          Korean localization source:
+            d91ff562c5094c3dae1787ae0df5977e80475543
+          Korean generated runtime assets:
+            d91ff562c5094c3dae1787ae0df5977e80475543
+          EOF
+
+          (
+            cd work/stage
+            zip -qr ../../JA2-Stracciatella-Korean-v0.1.0-alpha.3-Windows.zip \
+              JA2-Stracciatella-Korean-v0.1.0-alpha.3-Windows
+          )
+          (
+            cd work/mod
+            zip -qr ../../JA2-Stracciatella-Korean-v0.1.0-alpha.3-Mod.zip \
+              korean-localization
+          )
+
+          python - <<'PYVERIFY'
+          import zipfile
+          from pathlib import Path
+          for path in Path('.').glob('JA2-Stracciatella-Korean-v0.1.0-alpha.3-*.zip'):
+              with zipfile.ZipFile(path) as archive:
+                  assert archive.testzip() is None
+                  roots={name.split('/')[0] for name in archive.namelist()}
+                  assert len(roots)==1, roots
+                  if path.name.endswith('-Windows.zip'):
+                      assert any(n.endswith('/ja2.exe') for n in archive.namelist())
+                      assert any(n.endswith('/ja2-launcher.exe') for n in archive.namelist())
+                  assert any('korean-localization/' in n for n in archive.namelist())
+          PYVERIFY
+          sha256sum \
+            JA2-Stracciatella-Korean-v0.1.0-alpha.3-Windows.zip \
+            JA2-Stracciatella-Korean-v0.1.0-alpha.3-Mod.zip \
+            > SHA256SUMS.txt
+
+      - name: Publish prerelease
+        if: steps.existing.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > release-notes.md <<'EOF'
+          ## JA2 Stracciatella 한국어판 v0.1.0-alpha.3
+
+          - 공식 upstream `c527753eb635216c21bfcbeb058b6ed86823072a`까지 148개 커밋 반영.
+          - IMP, 인벤토리, 외부 게임 데이터, 빌드 구조의 최신 변경을 반영하고 기존 한국어 런타임과 폰트를 유지했습니다.
+          - 런처의 실행 버튼을 한국어로 보완했습니다.
+          - 외부 문자열 2,118개(번역 1,966개, 의도적 원문 유지 152개), EDT 254개 파일과 한국어 폰트를 검증했습니다.
+          - Windows 빌드와 CI 테스트에 성공한 동일 커밋의 실행 파일 및 모드를 패키징했습니다.
+
+          Windows ZIP을 풀고 런처에서 보유한 원본 JA2 데이터 경로를 지정한 뒤 Korean Localization 모드를 활성화하세요.
+          원본 게임 데이터는 포함하지 않습니다. 실제 게임 내 전체 화면의 수동 플레이 검증은 별도입니다.
+          기준: `d91ff562c5094c3dae1787ae0df5977e80475543`
+          EOF
+
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$RELEASE_TARGET" \
+            --title 'JA2 Stracciatella 한국어판 v0.1.0-alpha.3' \
+            --notes-file release-notes.md \
+            --prerelease \
+            JA2-Stracciatella-Korean-v0.1.0-alpha.3-Windows.zip \
+            JA2-Stracciatella-Korean-v0.1.0-alpha.3-Mod.zip \
+            SHA256SUMS.txt
+
+      - name: Report existing release
+        if: steps.existing.outputs.exists == 'true'
+        run: echo "Release $TAG already exists; nothing to do."
